@@ -3,8 +3,10 @@ package epq.reference;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -115,6 +117,23 @@ public final class DumpContext {
                     "Argument '" + key + "' value " + value + " is out of range [" + min + "-" + max + "]");
         }
         return value;
+    }
+
+    /**
+     * Return the value for a required argument as a list of comma-separated
+     * strings.
+     * Each element is trimmed of leading and trailing whitespace.
+     *
+     * @param key the argument key
+     * @return an immutable list of trimmed strings
+     * @throws IllegalArgumentException if missing
+     */
+    public List<String> getList(String key) throws IllegalArgumentException {
+        String value = get(key);
+        return Collections.unmodifiableList(
+                Arrays.asList(Arrays.stream(value.split(","))
+                        .map(String::trim)
+                        .toArray(String[]::new)));
     }
 
     /**
