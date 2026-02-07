@@ -30,7 +30,8 @@ public final class TestDump {
     private static final Map<String, DumpModule> MODULES = Stream.of(
             new DumpXRayTransition(),
             new DumpElement(),
-            new DumpAtomicShell()
+            new DumpAtomicShell(),
+            new DumpComposition()
     // add more here
     ).collect(Collectors.toMap(DumpModule::name, m -> m));
 
@@ -51,7 +52,8 @@ public final class TestDump {
                 runSingle(args);
             }
         } catch (Exception e) {
-            System.err.println("Exception caught in TestDump (" + e.getClass().getSimpleName() + "): " + e.getMessage());
+            System.err
+                    .println("Exception caught in TestDump (" + e.getClass().getSimpleName() + "): " + e.getMessage());
             e.printStackTrace(System.err);
             System.exit(1);
         }
