@@ -73,10 +73,24 @@ class AtomicShellRow(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, strict=False)
 
 
+class CompositionRow(BaseModel):
+    """Model for a single Composition row (one element per row)."""
+
+    element: str
+    atomic_number: int
+    weight_fraction: float
+    normalized_weight_fraction: float
+    atomic_percent: float
+    atoms_per_kg: float
+
+    model_config = ConfigDict(str_strip_whitespace=True, strict=False)
+
+
 _MODELS: Dict[str, Type[BaseModel]] = {
     "Element": ElementRow,
     "XRayTransition": XRayTransitionRow,
     "AtomicShell": AtomicShellRow,
+    "Composition": CompositionRow,
 }
 
 
