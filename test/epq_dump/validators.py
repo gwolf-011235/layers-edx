@@ -73,15 +73,38 @@ class AtomicShellRow(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, strict=False)
 
 
-class CompositionRow(BaseModel):
-    """Model for a single Composition row (one element per row)."""
+class CompositionDetailRow(BaseModel):
+    """Model for a single CompositionDetail row (one element per row)."""
 
     element: str
     atomic_number: int
     weight_fraction: float
+    weight_fraction_sigma: float | EmptyStrToNone
     normalized_weight_fraction: float
+    normalized_weight_fraction_sigma: float | EmptyStrToNone
     atomic_percent: float
+    atomic_percent_sigma: float | EmptyStrToNone
     atoms_per_kg: float
+    atoms_per_kg_sigma: float | EmptyStrToNone
+    stoichiometry: float
+    stoichiometry_sigma: float | EmptyStrToNone
+
+    model_config = ConfigDict(str_strip_whitespace=True, strict=False)
+
+
+class CompositionSummaryRow(BaseModel):
+    """Model for CompositionSummary (whole-composition aggregate properties)."""
+
+    element_count: int
+    weight_avg_atomic_number: float
+    weight_avg_atomic_number_sigma: float | EmptyStrToNone
+    mean_atomic_number: float
+    mean_atomic_number_sigma: float | EmptyStrToNone
+    sum_weight_fraction: float
+    sum_weight_fraction_sigma: float | EmptyStrToNone
+    optimal_representation: str
+    is_uncertain: bool
+    name: str | EmptyStrToNone
 
     model_config = ConfigDict(str_strip_whitespace=True, strict=False)
 
@@ -90,7 +113,8 @@ _MODELS: Dict[str, Type[BaseModel]] = {
     "Element": ElementRow,
     "XRayTransition": XRayTransitionRow,
     "AtomicShell": AtomicShellRow,
-    "Composition": CompositionRow,
+    "CompositionDetail": CompositionDetailRow,
+    "CompositionSummary": CompositionSummaryRow,
 }
 
 

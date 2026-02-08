@@ -1,6 +1,6 @@
 import pytest
 from pytest import approx  # type: ignore
-from test.epq_dump.validators import CompositionRow
+from test.epq_dump.validators import CompositionDetailRow
 from layers_edx.element import Element, Composition
 
 
@@ -19,13 +19,15 @@ def get_params():
     return test_cases
 
 
-@pytest.mark.epq_ref(module="Composition")
+@pytest.mark.epq_ref(module="CompositionDetail")
 @pytest.mark.parametrize("elements,fractions", get_params())
 class TestCompositionImplementation:
     """Test that Python Composition implementation matches Java reference."""
 
     @pytest.fixture(autouse=True)
-    def setup(self, elements: str, fractions: str, java_dump: list[CompositionRow]):
+    def setup(
+        self, elements: str, fractions: str, java_dump: list[CompositionDetailRow]
+    ):
         # Parse test inputs
         element_names = elements.split(",")
         fraction_values = [float(f) for f in fractions.split(",")]

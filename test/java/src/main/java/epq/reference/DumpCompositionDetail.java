@@ -7,7 +7,7 @@ import gov.nist.microanalysis.EPQLibrary.Composition;
 import gov.nist.microanalysis.EPQLibrary.Element;
 
 /**
- * DumpComposition dumps properties of a material composition.
+ * DumpCompositionDetail dumps per-element properties of a material composition.
  *
  * Arguments:
  * - elements: comma-separated element symbols or atomic numbers (e.g. Fe,O or
@@ -17,28 +17,35 @@ import gov.nist.microanalysis.EPQLibrary.Element;
  *
  * Output: One row per element in the composition, containing:
  * - Element name and atomic number
- * - Weight fractions (normalized and unnormalized)
- * - Atomic percent
- * - Atoms per kilogram
+ * - Weight fractions (normalized and unnormalized) with uncertainties
+ * - Atomic percent with uncertainty
+ * - Atoms per kilogram with uncertainty
+ * - Stoichiometry (atomic fraction) with uncertainty
  */
-public final class DumpComposition implements DumpModule {
+public final class DumpCompositionDetail implements DumpModule {
 
   static final CsvSchema SCHEMA = new CsvSchema(
       new CsvColumn("element", STRING, false),
       new CsvColumn("atomic_number", INT, false),
       new CsvColumn("weight_fraction", DOUBLE, false),
+      new CsvColumn("weight_fraction_sigma", DOUBLE, true),
       new CsvColumn("normalized_weight_fraction", DOUBLE, false),
+      new CsvColumn("normalized_weight_fraction_sigma", DOUBLE, true),
       new CsvColumn("atomic_percent", DOUBLE, false),
-      new CsvColumn("atoms_per_kg", DOUBLE, false));
+      new CsvColumn("atomic_percent_sigma", DOUBLE, true),
+      new CsvColumn("atoms_per_kg", DOUBLE, false),
+      new CsvColumn("atoms_per_kg_sigma", DOUBLE, true),
+      new CsvColumn("stoichiometry", DOUBLE, false),
+      new CsvColumn("stoichiometry_sigma", DOUBLE, true));
 
   @Override
   public String name() {
-    return "Composition";
+    return "CompositionDetail";
   }
 
   @Override
   public String usage() {
-    return "Composition elements=<symbol,list> fractions=<decimal,list>\n" +
+    return "CompositionDetail elements=<symbol,list> fractions=<decimal,list>\n" +
         "  elements: comma-separated element symbols or atomic numbers (e.g. Fe,O or 26,8)\n" +
         "  fractions: comma-separated mass fractions (must match element count)";
   }
@@ -87,18 +94,44 @@ public final class DumpComposition implements DumpModule {
     // Emit one row per element
     for (Element elm : comp.getElementSet()) {
       CsvRowBuilder rowBuilder = new CsvRowBuilder(SCHEMA);
+
+      // Get properties with uncertainties
+      var wfU = comp.weightFractionU(elm, false);
+      var nwfU = comp.weightFractionU(elm, true);
+      var apU = comp.atomicPercentU(elm);
+      var apkgU = comp.atomsPerKgU(elm, true);
+      var stoichU = comp.stoichiometryU(elm);
+
+      // Extract nominal values and uncertainties
       rowBuilder
           .set("element", elm.toAbbrev())
           .set("atomic_number", elm.getAtomicNumber())
-          .set("weight_fraction", comp.weightFraction(elm, false))
-          .set("normalized_weight_fraction", comp.weightFraction(elm, true))
-          .set("atomic_percent", comp.atomicPercent(elm))
-          .set("atoms_per_kg", comp.atomsPerKg(elm, true));
+          .set("weight_fraction", wfU.doubleValue())
+          .set("weight_fraction_sigma", sigma(wfU))
+          .set("normalized_weight_fraction", nwfU.doubleValue())
+          .set("normalized_weight_fraction_sigma", sigma(nwfU))
+          .set("atomic_percent", apU.doubleValue())
+          .set("atomic_percent_sigma", sigma(apU))
+          .set("atoms_per_kg", apkgU.doubleValue())
+          .set("atoms_per_kg_sigma", sigma(apkgU))
+          .set("stoichiometry", stoichU.doubleValue())
+          .set("stoichiometry_sigma", sigma(stoichU));
 
       ctx.row(rowBuilder.buildRow());
     }
 
     ctx.flush();
+  }
+
+  /**
+   * Extract uncertainty (sigma) from UncertainValue2, returning null if zero.
+   *
+   * @param uv the UncertainValue2 object
+   * @return the uncertainty value or null if uncertainty is zero or unavailable
+   */
+  private static Double sigma(gov.nist.microanalysis.Utility.UncertainValue2 uv) {
+    double unc = uv.uncertainty();
+    return unc > 0.0 ? unc : null;
   }
 
   /**

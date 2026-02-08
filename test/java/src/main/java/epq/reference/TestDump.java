@@ -31,7 +31,8 @@ public final class TestDump {
             new DumpXRayTransition(),
             new DumpElement(),
             new DumpAtomicShell(),
-            new DumpComposition()
+            new DumpCompositionDetail(),
+            new DumpCompositionSummary()
     // add more here
     ).collect(Collectors.toMap(DumpModule::name, m -> m));
 
