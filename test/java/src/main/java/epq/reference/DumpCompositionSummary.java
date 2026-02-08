@@ -74,7 +74,7 @@ public final class DumpCompositionSummary implements DumpModule {
 
     for (int i = 0; i < elementNames.size(); i++) {
       String elemName = elementNames.get(i);
-      Element elm = parseElement(elemName);
+      Element elm = DumpUtils.parseElement(elemName);
       if (elm == null) {
         throw new IllegalArgumentException("Unknown element: " + elemName);
       }
@@ -101,50 +101,16 @@ public final class DumpCompositionSummary implements DumpModule {
     rowBuilder
         .set("element_count", comp.getElementCount())
         .set("weight_avg_atomic_number", wavgU.doubleValue())
-        .set("weight_avg_atomic_number_sigma", sigma(wavgU))
+        .set("weight_avg_atomic_number_sigma", DumpUtils.sigma(wavgU))
         .set("mean_atomic_number", meanU.doubleValue())
-        .set("mean_atomic_number_sigma", sigma(meanU))
+        .set("mean_atomic_number_sigma", DumpUtils.sigma(meanU))
         .set("sum_weight_fraction", sumU.doubleValue())
-        .set("sum_weight_fraction_sigma", sigma(sumU))
+        .set("sum_weight_fraction_sigma", DumpUtils.sigma(sumU))
         .set("optimal_representation", comp.getOptimalRepresentation().name())
         .set("is_uncertain", comp.isUncertain())
         .set("name", comp.getName());
 
     ctx.row(rowBuilder.buildRow());
     ctx.flush();
-  }
-
-  /**
-   * Extract uncertainty (sigma) from UncertainValue2, returning null if zero.
-   *
-   * @param uv the UncertainValue2 object
-   * @return the uncertainty value or null if uncertainty is zero or unavailable
-   */
-  private static Double sigma(gov.nist.microanalysis.Utility.UncertainValue2 uv) {
-    double unc = uv.uncertainty();
-    return unc > 0.0 ? unc : null;
-  }
-
-  /**
-   * Parse an element from a string, which can be:
-   * - An element symbol (Fe, Au, Si)
-   * - An atomic number as string (26, 79, 14)
-   *
-   * @return the Element, or null if not found
-   */
-  private static Element parseElement(String input) {
-    // Try parsing as atomic number first
-    try {
-      int z = Integer.parseInt(input);
-      if (z >= 1 && z < Element.elmEndOfElements) {
-        return Element.byAtomicNumber(z);
-      }
-      return null;
-    } catch (NumberFormatException e) {
-      // Not a number, try by name
-    }
-
-    // Try by symbol only
-    return Element.byAbbrev(input);
   }
 }

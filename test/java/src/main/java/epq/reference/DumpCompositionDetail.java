@@ -74,7 +74,7 @@ public final class DumpCompositionDetail implements DumpModule {
 
     for (int i = 0; i < elementNames.size(); i++) {
       String elemName = elementNames.get(i);
-      Element elm = parseElement(elemName);
+      Element elm = DumpUtils.parseElement(elemName);
       if (elm == null) {
         throw new IllegalArgumentException("Unknown element: " + elemName);
       }
@@ -107,53 +107,19 @@ public final class DumpCompositionDetail implements DumpModule {
           .set("element", elm.toAbbrev())
           .set("atomic_number", elm.getAtomicNumber())
           .set("weight_fraction", wfU.doubleValue())
-          .set("weight_fraction_sigma", sigma(wfU))
+          .set("weight_fraction_sigma", DumpUtils.sigma(wfU))
           .set("normalized_weight_fraction", nwfU.doubleValue())
-          .set("normalized_weight_fraction_sigma", sigma(nwfU))
+          .set("normalized_weight_fraction_sigma", DumpUtils.sigma(nwfU))
           .set("atomic_percent", apU.doubleValue())
-          .set("atomic_percent_sigma", sigma(apU))
+          .set("atomic_percent_sigma", DumpUtils.sigma(apU))
           .set("atoms_per_kg", apkgU.doubleValue())
-          .set("atoms_per_kg_sigma", sigma(apkgU))
+          .set("atoms_per_kg_sigma", DumpUtils.sigma(apkgU))
           .set("stoichiometry", stoichU.doubleValue())
-          .set("stoichiometry_sigma", sigma(stoichU));
+          .set("stoichiometry_sigma", DumpUtils.sigma(stoichU));
 
       ctx.row(rowBuilder.buildRow());
     }
 
     ctx.flush();
-  }
-
-  /**
-   * Extract uncertainty (sigma) from UncertainValue2, returning null if zero.
-   *
-   * @param uv the UncertainValue2 object
-   * @return the uncertainty value or null if uncertainty is zero or unavailable
-   */
-  private static Double sigma(gov.nist.microanalysis.Utility.UncertainValue2 uv) {
-    double unc = uv.uncertainty();
-    return unc > 0.0 ? unc : null;
-  }
-
-  /**
-   * Parse an element from a string, which can be:
-   * - An element symbol (Fe, Au, Si)
-   * - An atomic number as string (26, 79, 14)
-   *
-   * @return the Element, or null if not found
-   */
-  private static Element parseElement(String input) {
-    // Try parsing as atomic number first
-    try {
-      int z = Integer.parseInt(input);
-      if (z >= 1 && z < Element.elmEndOfElements) {
-        return Element.byAtomicNumber(z);
-      }
-      return null;
-    } catch (NumberFormatException e) {
-      // Not a number, try by name
-    }
-
-    // Try by symbol only
-    return Element.byAbbrev(input);
   }
 }
