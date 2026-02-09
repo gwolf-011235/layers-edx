@@ -187,9 +187,9 @@ class TestCompositionDetail:
             py_elem = self._find_element_by_atomic_number(ref_row.atomic_number)
             py_wf = py_fractions[py_elem]
 
-            assert py_wf == approx(
-                ref_row.normalized_weight_fraction,
-            ), f"Normalized weight fraction mismatch for {ref_row.element}"
+            assert ref_row.normalized_weight_fraction == approx(py_wf), (
+                f"Normalized weight fraction mismatch for {ref_row.element}"
+            )
 
     def test_atomic_fractions_match(self):
         py_atomic_fractions = self.py_composition.atomic_fractions
@@ -199,7 +199,7 @@ class TestCompositionDetail:
             py_elem = self._find_element_by_atomic_number(ref_row.atomic_number)
             py_af = py_atomic_fractions[py_elem]
 
-            assert py_af == approx(ref_row.atomic_percent), (
+            assert ref_row.atomic_percent == approx(py_af), (
                 f"Atomic fraction mismatch for {ref_row.element}"
             )
 
@@ -211,7 +211,7 @@ class TestCompositionDetail:
             py_elem = self._find_element_by_atomic_number(ref_row.atomic_number)
             py_apk = py_atoms_per_kg[py_elem]
 
-            assert py_apk == approx(ref_row.atoms_per_kg), (
+            assert ref_row.atoms_per_kg == approx(py_apk), (
                 f"Atoms per kg mismatch for {ref_row.element}"
             )
 
@@ -238,19 +238,19 @@ class TestCompositionSummary:
         self.ref_row = java_dump[0]
 
     def test_element_count(self):
-        assert len(self.py_composition.elements) == self.ref_row.element_count
+        assert self.ref_row.element_count == len(self.py_composition.elements)
 
     def test_mean_atomic_number(self):
         py_mean_z = self.py_composition.mean_atomic_number
 
-        assert py_mean_z == approx(self.ref_row.mean_atomic_number)
+        assert self.ref_row.mean_atomic_number == approx(py_mean_z)
 
     def test_weight_avg_atomic_number(self):
         pytest.skip(reason="Not implemented")
         # py_wavg_z = self.py_composition.weight_avg_atomic_number
-        # assert py_wavg_z == approx(self.ref_row.weight_avg_atomic_number)
+        # assert self.ref_row.weight_avg_atomic_number == approx(py_wavg_z)
 
     def test_sum_weight_fractions(self):
         py_sum = self.py_composition.sum_weight_fractions
 
-        assert py_sum == approx(self.ref_row.sum_weight_fraction)
+        assert self.ref_row.sum_weight_fraction == approx(py_sum)
