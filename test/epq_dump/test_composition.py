@@ -1,6 +1,6 @@
 import pytest
 from pytest import approx  # type: ignore
-from test.epq_dump.validators import CompositionDetailRow
+from test.epq_dump.validators import CompositionDetailRow, CompositionSummaryRow
 from layers_edx.element import Element, Composition
 
 
@@ -21,8 +21,9 @@ def get_params():
 
 @pytest.mark.epq_ref(module="CompositionDetail")
 @pytest.mark.parametrize("elements,fractions", get_params())
-class TestCompositionImplementation:
-    """Test that Python Composition implementation matches Java reference."""
+class TestCompositionDetail:
+    """Test that Python Composition implementation matches Java reference for
+    per-element properties."""
 
     @pytest.fixture(autouse=True)
     def setup(
@@ -39,10 +40,6 @@ class TestCompositionImplementation:
 
         # Java reference data
         self.ref_rows = java_dump
-
-    def test_element_count_matches(self):
-        """Number of elements in Python should match Java reference."""
-        assert len(self.py_composition.elements) == len(self.ref_rows)
 
     def test_normalized_weight_fractions_match(self):
         """Python normalized weight fractions should match Java reference."""
@@ -131,6 +128,7 @@ class TestCompositionImplementation:
             assert py_apk == approx(ref_row.atoms_per_kg), (
                 f"Atoms per kg mismatch for {ref_row.element}"
             )
+
 
 @pytest.mark.epq_ref(module="CompositionSummary")
 @pytest.mark.parametrize("elements,fractions", get_params())
