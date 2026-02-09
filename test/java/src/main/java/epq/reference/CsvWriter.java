@@ -52,12 +52,39 @@ public final class CsvWriter {
 
     /**
      * Write a CSV line.
+     * Escapes field values according to RFC 4180:
+     * - If a field contains comma, double-quote, or newline, it is wrapped in
+     * quotes
+     * - Internal double-quotes are escaped by doubling them
      *
      * @param values The values for the line.
      */
     private void writeLine(String[] values) {
         String line = Stream.of(values)
+                .map(this::escapeCsvField)
                 .collect(Collectors.joining(","));
         out.println(line);
+    }
+
+    /**
+     * Escape a single CSV field value according to RFC 4180.
+     *
+     * @param value The field value (may be null or empty)
+     * @return The escaped field value
+     */
+    private String escapeCsvField(String value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+
+        // Check if escaping is needed (contains comma, quote, or newline)
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            // Escape internal quotes by doubling them
+            String escaped = value.replace("\"", "\"\"");
+            // Wrap entire field in quotes
+            return "\"" + escaped + "\"";
+        }
+
+        return value;
     }
 }
