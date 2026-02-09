@@ -42,26 +42,18 @@ class TestCompositionDetail:
         self.ref_rows = java_dump
 
     def test_normalized_weight_fractions_match(self):
-        """Python normalized weight fractions should match Java reference."""
         py_fractions = self.py_composition.weight_fractions
 
         for ref_row in self.ref_rows:
             # Find corresponding element in Python composition
             py_elem = next(
-                (e for e in self.py_composition.elements if e.name == ref_row.element),
+                (
+                    e
+                    for e in self.py_composition.elements
+                    if e.atomic_number == ref_row.atomic_number
+                ),
                 None,
             )
-
-            if py_elem is None:
-                # Try matching by atomic number if name doesn't match
-                py_elem = next(
-                    (
-                        e
-                        for e in self.py_composition.elements
-                        if e.atomic_number == ref_row.atomic_number
-                    ),
-                    None,
-                )
 
             assert py_elem is not None, f"Could not find element {ref_row.element}"
             py_wf = py_fractions[py_elem]
@@ -71,26 +63,20 @@ class TestCompositionDetail:
             ), f"Normalized weight fraction mismatch for {ref_row.element}"
 
     def test_atomic_fractions_match(self):
-        """Python atomic fractions should match Java reference."""
         py_atomic_fractions = self.py_composition.atomic_fractions
 
         for ref_row in self.ref_rows:
             # Find corresponding element
             py_elem = next(
-                (e for e in self.py_composition.elements if e.name == ref_row.element),
+                (
+                    e
+                    for e in self.py_composition.elements
+                    if e.atomic_number == ref_row.atomic_number
+                ),
                 None,
             )
-            if py_elem is None:
-                py_elem = next(
-                    (
-                        e
-                        for e in self.py_composition.elements
-                        if e.atomic_number == ref_row.atomic_number
-                    ),
-                    None,
-                )
 
-            assert py_elem is not None
+            assert py_elem is not None, f"Could not find element {ref_row.element}"
             py_af = py_atomic_fractions[py_elem]
 
             assert py_af == approx(ref_row.atomic_percent), (
@@ -98,31 +84,20 @@ class TestCompositionDetail:
             )
 
     def test_atoms_per_kg_match(self):
-        """Python atoms_per_kg should match Java reference.
-
-        This test uses a looser tolerance (1e-6) because atoms_per_kg depends on
-        atomic weights and physical constants (Avogadro's number, AMU) which may
-        have slight differences in precision between Python and Java implementations.
-        """
         py_atoms_per_kg = self.py_composition.atoms_per_kg
 
         for ref_row in self.ref_rows:
             # Find corresponding element
             py_elem = next(
-                (e for e in self.py_composition.elements if e.name == ref_row.element),
+                (
+                    e
+                    for e in self.py_composition.elements
+                    if e.atomic_number == ref_row.atomic_number
+                ),
                 None,
             )
-            if py_elem is None:
-                py_elem = next(
-                    (
-                        e
-                        for e in self.py_composition.elements
-                        if e.atomic_number == ref_row.atomic_number
-                    ),
-                    None,
-                )
 
-            assert py_elem is not None
+            assert py_elem is not None, f"Could not find element {ref_row.element}"
             py_apk = py_atoms_per_kg[py_elem]
 
             assert py_apk == approx(ref_row.atoms_per_kg), (
