@@ -1,3 +1,5 @@
+import random
+
 import pytest
 from pytest import approx  # type: ignore
 from test.epq_dump.validators import CompositionDetailRow, CompositionSummaryRow
@@ -19,8 +21,119 @@ def get_params():
     return test_cases
 
 
+def generate_random_compositions(
+    count: int,
+    min_elements: int = 2,
+    max_elements: int = 4,
+    normalize_fractions: bool = True,
+    min_fraction: float = 0.05,
+    max_fraction: float = 1.0,
+    seed: int | None = None,
+    element_range: tuple[int, int] = (1, 92),
+) -> list[tuple[str, str]]:
+    """Generate random composition test cases.
+
+    Args:
+        count: Number of test cases to generate
+        min_elements: Minimum elements per composition (default: 2)
+        max_elements: Maximum elements per composition (default: 4)
+        normalize_fractions: If True, scale fractions to sum=1; if False, use raw values
+            (default: True)
+        min_fraction: Minimum fraction value for each element (default: 0.05)
+        max_fraction: Maximum fraction value for each element (default: 1.0)
+        seed: Random seed for reproducibility (default: None)
+        element_range: Tuple of (min_atomic_number, max_atomic_number) for element
+            selection (default: (1, 92))
+
+    Returns:
+        List of tuples in format: [(elements_str, fractions_str), ...]
+        where elements_str is comma-separated element symbols (e.g., "Fe,O")
+        and fractions_str is comma-separated fraction values (e.g., "0.7200,0.2800")
+
+    Examples:
+        # Generate 5 normalized compositions with seed for reproducibility
+        >>> cases = generate_random_compositions(count=5, seed=42)
+
+        # Generate pure elements and multi-element compositions
+        >>> cases = generate_random_compositions(count=10, min_elements=1,
+        ...     max_elements=3, seed=123)
+
+        # Generate 10 unnormalized compositions with 2-3 elements
+        >>> cases = generate_random_compositions(
+        ...     count=10,
+        ...     min_elements=2,
+        ...     max_elements=3,
+        ...     normalize_fractions=False,
+        ...     seed=123
+        ... )
+    """
+    if seed is not None:
+        random.seed(seed)
+
+    # Enforce constraints
+    min_elements = max(1, min_elements)
+    if min_elements > max_elements:
+        raise ValueError(
+            f"min_elements ({min_elements}) cannot be greater than \
+                max_elements ({max_elements})"
+        )
+
+    # Ensure max_elements doesn't exceed available elements in range
+    available_elements = element_range[1] - element_range[0] + 1
+    if max_elements > available_elements:
+        raise ValueError(
+            f"max_elements ({max_elements}) exceeds available elements \
+                ({available_elements}) in range {element_range}"
+        )
+
+    test_cases: list[tuple[str, str]] = []
+
+    for _ in range(count):
+        # Randomly choose number of elements for this composition
+        num_elements = random.randint(min_elements, max_elements)
+
+        # Randomly select unique atomic numbers
+        atomic_numbers = random.sample(
+            range(element_range[0], element_range[1] + 1), num_elements
+        )
+
+        # Get element symbols using Element.NAME
+        symbols = [Element.NAME[z] for z in atomic_numbers]
+
+        # Generate random fractions
+        fractions = [
+            random.uniform(min_fraction, max_fraction) for _ in range(num_elements)
+        ]
+
+        # Normalize if requested
+        if normalize_fractions:
+            total = sum(fractions)
+            fractions = [f / total for f in fractions]
+
+        # Format as strings
+        elements_str = ",".join(symbols)
+        fractions_str = ",".join(f"{f:.4f}" for f in fractions)
+
+        test_cases.append((elements_str, fractions_str))
+
+    return test_cases
+
+
+def get_random_params(count: int = 10, seed: int = 42) -> list[tuple[str, str]]:
+    """Get random composition test parameters with sensible defaults.
+
+    Args:
+        count: Number of test cases to generate (default: 10)
+        seed: Random seed for reproducibility (default: 42)
+
+    Returns:
+        List of tuples in format: [(elements_str, fractions_str), ...]
+    """
+    return generate_random_compositions(count=count, seed=seed)
+
+
 @pytest.mark.epq_ref(module="CompositionDetail")
-@pytest.mark.parametrize("elements,fractions", get_params())
+@pytest.mark.parametrize("elements,fractions", get_random_params())
 class TestCompositionDetail:
     """Test that Python Composition implementation matches Java reference for
     per-element properties."""
@@ -104,7 +217,7 @@ class TestCompositionDetail:
 
 
 @pytest.mark.epq_ref(module="CompositionSummary")
-@pytest.mark.parametrize("elements,fractions", get_params())
+@pytest.mark.parametrize("elements,fractions", get_random_params())
 class TestCompositionSummary:
     """Test that Python Composition implementation matches Java reference for
     aggregate properties."""
