@@ -41,21 +41,37 @@ class TestCompositionDetail:
         # Java reference data
         self.ref_rows = java_dump
 
+    def _find_element_by_atomic_number(self, atomic_number: int):
+        """Find element in composition by atomic number.
+
+        Args:
+            atomic_number: The atomic number to search for
+
+        Returns:
+            The Element object with matching atomic number
+
+        Raises:
+            AssertionError: If element not found
+        """
+        py_elem = next(
+            (
+                e
+                for e in self.py_composition.elements
+                if e.atomic_number == atomic_number
+            ),
+            None,
+        )
+        assert py_elem is not None, (
+            f"Could not find element with atomic number {atomic_number}"
+        )
+        return py_elem
+
     def test_normalized_weight_fractions_match(self):
         py_fractions = self.py_composition.weight_fractions
 
         for ref_row in self.ref_rows:
             # Find corresponding element in Python composition
-            py_elem = next(
-                (
-                    e
-                    for e in self.py_composition.elements
-                    if e.atomic_number == ref_row.atomic_number
-                ),
-                None,
-            )
-
-            assert py_elem is not None, f"Could not find element {ref_row.element}"
+            py_elem = self._find_element_by_atomic_number(ref_row.atomic_number)
             py_wf = py_fractions[py_elem]
 
             assert py_wf == approx(
@@ -67,16 +83,7 @@ class TestCompositionDetail:
 
         for ref_row in self.ref_rows:
             # Find corresponding element
-            py_elem = next(
-                (
-                    e
-                    for e in self.py_composition.elements
-                    if e.atomic_number == ref_row.atomic_number
-                ),
-                None,
-            )
-
-            assert py_elem is not None, f"Could not find element {ref_row.element}"
+            py_elem = self._find_element_by_atomic_number(ref_row.atomic_number)
             py_af = py_atomic_fractions[py_elem]
 
             assert py_af == approx(ref_row.atomic_percent), (
@@ -88,16 +95,7 @@ class TestCompositionDetail:
 
         for ref_row in self.ref_rows:
             # Find corresponding element
-            py_elem = next(
-                (
-                    e
-                    for e in self.py_composition.elements
-                    if e.atomic_number == ref_row.atomic_number
-                ),
-                None,
-            )
-
-            assert py_elem is not None, f"Could not find element {ref_row.element}"
+            py_elem = self._find_element_by_atomic_number(ref_row.atomic_number)
             py_apk = py_atoms_per_kg[py_elem]
 
             assert py_apk == approx(ref_row.atoms_per_kg), (
