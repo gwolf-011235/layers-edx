@@ -132,11 +132,41 @@ class TestCompositionImplementation:
                 f"Atoms per kg mismatch for {ref_row.element}"
             )
 
-    def test_mean_atomic_number_consistency(self):
-        """Python mean atomic number should be consistent with element weights."""
-        mean_z = self.py_composition.mean_atomic_number
-        assert 1 <= mean_z <= 118, "Mean atomic number should be within valid range"
+@pytest.mark.epq_ref(module="CompositionSummary")
+@pytest.mark.parametrize("elements,fractions", get_params())
+class TestCompositionSummary:
+    """Test that Python Composition implementation matches Java reference for
+    aggregate properties."""
 
-        # Mean should be between min and max element Z
-        z_values = [e.atomic_number for e in self.py_composition.elements]
-        assert min(z_values) <= mean_z <= max(z_values)
+    @pytest.fixture(autouse=True)
+    def setup(
+        self, elements: str, fractions: str, java_dump: list[CompositionSummaryRow]
+    ):
+        # Parse test inputs
+        element_names = elements.split(",")
+        fraction_values = [float(f) for f in fractions.split(",")]
+
+        # Create Python composition
+        py_elements = [Element(name.strip()) for name in element_names]
+        self.py_composition = Composition(py_elements, fraction_values, weight=True)
+
+        # Java reference data (single row for whole composition)
+        self.ref_row = java_dump[0]
+
+    def test_element_count(self):
+        assert len(self.py_composition.elements) == self.ref_row.element_count
+
+    def test_mean_atomic_number(self):
+        py_mean_z = self.py_composition.mean_atomic_number
+
+        assert py_mean_z == approx(self.ref_row.mean_atomic_number)
+
+    def test_weight_avg_atomic_number(self):
+        pytest.skip(reason="Not implemented")
+        # py_wavg_z = self.py_composition.weight_avg_atomic_number
+        # assert py_wavg_z == approx(self.ref_row.weight_avg_atomic_number)
+
+    def test_sum_weight_fractions(self):
+        py_sum = self.py_composition.sum_weight_fractions
+
+        assert py_sum == approx(self.ref_row.sum_weight_fraction)
