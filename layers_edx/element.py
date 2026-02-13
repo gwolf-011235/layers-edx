@@ -275,23 +275,36 @@ class Composition:
         return dict(zip(self.elements, fractions))
 
     @property
-    def sum_weight_fractions(self) -> float:
+    def raw_sum_weight_fractions(self) -> float:
         """The non-normalized sum of the weight fractions."""
         return sum(self._weight_fractions)
 
     @property
-    def atoms_per_kg(self) -> dict[Element, float]:
+    def sum_weight_fractions(self) -> float:
+        """The sum of the normalized weight fractions."""
+        return sum(self.weight_fractions.values())
+
+    @property
+    def raw_atoms_per_kg(self) -> dict[Element, float]:
         """Number of atoms of the elements in one kilogram of material
         with this composition."""
+        return {e: f / e.mass for e, f in self.raw_weight_fractions.items()}
+
+    @property
+    def atoms_per_kg(self) -> dict[Element, float]:
+        """Number of atoms of the elements in one kilogram of material
+        with this normalized composition."""
         return {e: f / e.mass for e, f in self.weight_fractions.items()}
 
     @property
-    def mean_atomic_number(self) -> float:
-        return sum([e.atomic_number * f for e, f in self.weight_fractions.items()])
+    def raw_mean_atomic_number(self) -> float:
+        """The mean atomic number based on the raw weight fractions."""
+        return sum([e.atomic_number * f for e, f in self.raw_weight_fractions.items()])
 
-    def normalize(self):
-        """Normalizes the weight fractions."""
-        self._weight_fractions = self.normalize_fractions(self._weight_fractions)
+    @property
+    def mean_atomic_number(self) -> float:
+        """The mean atomic number based on the normalized weight fractions."""
+        return sum([e.atomic_number * f for e, f in self.weight_fractions.items()])
 
     def weight_difference(
         self, other: Composition, normalized: bool = True
