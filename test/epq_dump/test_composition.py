@@ -4,6 +4,7 @@ import pytest
 from pytest import approx  # type: ignore
 from test.epq_dump.validators import CompositionDetailRow, CompositionSummaryRow
 from layers_edx.element import Element, Composition
+from test.epq_dump.conftest import FULL_SUITE
 
 
 def get_params():
@@ -11,6 +12,9 @@ def get_params():
 
     Format: (elements_str, fractions_str)
     """
+    if FULL_SUITE:
+        return get_random_params(count=500, seed=42)
+
     test_cases = [
         ("Fe", "1.0"),  # Pure element
         ("Fe,O", "0.72,0.28"),  # Binary: Iron oxide
@@ -25,7 +29,7 @@ def generate_random_compositions(
     count: int,
     min_elements: int = 2,
     max_elements: int = 4,
-    normalize_fractions: bool = True,
+    normalize_fractions: bool = False,
     min_fraction: float = 0.05,
     max_fraction: float = 1.0,
     seed: int | None = None,
@@ -133,7 +137,7 @@ def get_random_params(count: int = 10, seed: int = 42) -> list[tuple[str, str]]:
 
 
 @pytest.mark.epq_ref(module="CompositionDetail")
-@pytest.mark.parametrize("elements,fractions", get_random_params())
+@pytest.mark.parametrize("elements,fractions", get_params())
 class TestCompositionDetail:
     """Test that Python Composition implementation matches Java reference for
     per-element properties."""
@@ -217,7 +221,7 @@ class TestCompositionDetail:
 
 
 @pytest.mark.epq_ref(module="CompositionSummary")
-@pytest.mark.parametrize("elements,fractions", get_random_params())
+@pytest.mark.parametrize("elements,fractions", get_params())
 class TestCompositionSummary:
     """Test that Python Composition implementation matches Java reference for
     aggregate properties."""
