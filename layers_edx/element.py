@@ -233,22 +233,17 @@ class Composition:
         elements: list[Element],
         fractions: list[float],
         weight: bool = True,
-        normalize: bool = True,
     ):
         self._elements = elements
         if weight:
             self._weight_fractions = fractions
         else:
             self._weight_fractions = self.weight_from_atomic(elements, fractions)
-        if normalize:
-            self.normalize()
 
     def copy(self) -> Composition:
         """Initializes a new object with shallow copies of the `elements`
         and `weight_fractions` lists."""
-        return Composition(
-            self._elements.copy(), self._weight_fractions.copy(), normalize=False
-        )
+        return Composition(self._elements.copy(), self._weight_fractions.copy())
 
     @property
     def elements(self) -> list[Element]:
