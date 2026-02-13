@@ -241,7 +241,7 @@ class TestCompositionSummary:
         assert self.ref_row.element_count == len(self.py_composition.elements)
 
     def test_mean_atomic_number(self):
-        py_mean_z = self.py_composition.mean_atomic_number
+        py_mean_z = self.py_composition.raw_mean_atomic_number
 
         assert self.ref_row.mean_atomic_number == approx(py_mean_z)
 
@@ -251,6 +251,6 @@ class TestCompositionSummary:
         # assert self.ref_row.weight_avg_atomic_number == approx(py_wavg_z)
 
     def test_sum_weight_fractions(self):
-        py_sum = self.py_composition.sum_weight_fractions
+        py_sum = self.py_composition.raw_sum_weight_fractions
 
         assert self.ref_row.sum_weight_fraction == approx(py_sum)
