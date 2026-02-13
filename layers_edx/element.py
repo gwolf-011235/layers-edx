@@ -204,9 +204,9 @@ class Composition:
         fractions_sum = sum(fractions)
         return [fraction / fractions_sum for fraction in fractions]
 
-    @classmethod
+    @staticmethod
     def atomic_from_weight(
-        cls, elements: list[Element], fractions: list[float]
+        elements: list[Element], fractions: list[float]
     ) -> list[float]:
         """Computes the atomic fractions from the provided `elements`
         and weight `fractions`."""
@@ -214,11 +214,11 @@ class Composition:
             fraction / element.atomic_weight
             for element, fraction in zip(elements, fractions)
         ]
-        return cls.normalize_fractions(atomic_fractions)
+        return Composition.normalize_fractions(atomic_fractions)
 
-    @classmethod
+    @staticmethod
     def weight_from_atomic(
-        cls, elements: list[Element], fractions: list[float]
+        elements: list[Element], fractions: list[float]
     ) -> list[float]:
         """Computes the weight fractions from the provided `elements`
         and atomic `fractions`."""
@@ -226,7 +226,7 @@ class Composition:
             fraction * element.atomic_weight
             for element, fraction in zip(elements, fractions)
         ]
-        return cls.normalize_fractions(weight_fractions)
+        return Composition.normalize_fractions(weight_fractions)
 
     def __init__(
         self,
