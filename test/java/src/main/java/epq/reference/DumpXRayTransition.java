@@ -16,8 +16,7 @@ public final class DumpXRayTransition implements DumpModule {
             new CsvColumn("source_shell", STRING, false),
             new CsvColumn("destination_shell", STRING, false),
             new CsvColumn("family", STRING, false),
-            new CsvColumn("is_well_known", BOOL, false),
-            new CsvColumn("exists", BOOL, true),
+            new CsvColumn("exists", BOOL, false),
             new CsvColumn("energy_eV", DOUBLE, true),
             new CsvColumn("edge_energy_eV", DOUBLE, true),
             new CsvColumn("weight_default", DOUBLE, true),
@@ -51,7 +50,6 @@ public final class DumpXRayTransition implements DumpModule {
         final Element el = Element.byAtomicNumber(Z);
 
         final XRayTransition xrt = new XRayTransition(el, trans);
-        final boolean isWellKnown = xrt.isWellKnown();
 
         rowBuilder
                 .set("Z", Z)
@@ -59,14 +57,7 @@ public final class DumpXRayTransition implements DumpModule {
                 .set("transition_name", xrt.getSiegbahnName())
                 .set("source_shell", AtomicShell.getSiegbahnName(xrt.getSourceShell()))
                 .set("destination_shell", AtomicShell.getSiegbahnName(xrt.getDestinationShell()))
-                .set("family", AtomicShell.getFamilyName(xrt.getFamily()))
-                .set("is_well_known", isWellKnown);
-
-        if (!isWellKnown) {
-            ctx.row(rowBuilder.buildRow());
-            ctx.flush();
-            return;
-        }
+                .set("family", AtomicShell.getFamilyName(xrt.getFamily()));
 
         final boolean exists = xrt.exists();
 
