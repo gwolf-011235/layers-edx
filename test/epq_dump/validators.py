@@ -30,6 +30,7 @@ class ElementRow(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, strict=False)
 
+
 class XRayTransitionRow(BaseModel):
     """Model for a single XRayTransition row."""
 
@@ -41,7 +42,7 @@ class XRayTransitionRow(BaseModel):
     family: str
     is_well_known: bool
     exists: bool | EmptyStrToNone
-    energy_eV: float | EmptyStrToNone
+    energy: float | EmptyStrToNone
     edge_energy_eV: float | EmptyStrToNone
     weight_default: float | EmptyStrToNone
     weight_family: float | EmptyStrToNone
@@ -51,9 +52,69 @@ class XRayTransitionRow(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, strict=False)
 
 
+class AtomicShellRow(BaseModel):
+    """Model for a single AtomicShell row."""
+
+    Z: int
+    shell_index: int
+    shell_name_siegbahn: str
+    shell_name_iupac: str
+    shell_name_atomic: str
+    family: str
+    principal_quantum_number: int
+    orbital_angular_momentum: int
+    total_angular_momentum: float
+    capacity: int
+    exists: bool | EmptyStrToNone
+    ground_state_occupancy: int | EmptyStrToNone
+    edge_energy_ev: float | EmptyStrToNone
+    energy_J: float | EmptyStrToNone
+
+    model_config = ConfigDict(str_strip_whitespace=True, strict=False)
+
+
+class CompositionDetailRow(BaseModel):
+    """Model for a single CompositionDetail row (one element per row)."""
+
+    element: str
+    atomic_number: int
+    weight_fraction: float
+    weight_fraction_sigma: float | EmptyStrToNone
+    normalized_weight_fraction: float
+    normalized_weight_fraction_sigma: float | EmptyStrToNone
+    atomic_percent: float
+    atomic_percent_sigma: float | EmptyStrToNone
+    atoms_per_kg: float
+    atoms_per_kg_sigma: float | EmptyStrToNone
+    stoichiometry: float
+    stoichiometry_sigma: float | EmptyStrToNone
+
+    model_config = ConfigDict(str_strip_whitespace=True, strict=False)
+
+
+class CompositionSummaryRow(BaseModel):
+    """Model for CompositionSummary (whole-composition aggregate properties)."""
+
+    element_count: int
+    weight_avg_atomic_number: float
+    weight_avg_atomic_number_sigma: float | EmptyStrToNone
+    mean_atomic_number: float
+    mean_atomic_number_sigma: float | EmptyStrToNone
+    sum_weight_fraction: float
+    sum_weight_fraction_sigma: float | EmptyStrToNone
+    optimal_representation: str
+    is_uncertain: bool
+    name: str | EmptyStrToNone
+
+    model_config = ConfigDict(str_strip_whitespace=True, strict=False)
+
+
 _MODELS: Dict[str, Type[BaseModel]] = {
     "Element": ElementRow,
     "XRayTransition": XRayTransitionRow,
+    "AtomicShell": AtomicShellRow,
+    "CompositionDetail": CompositionDetailRow,
+    "CompositionSummary": CompositionSummaryRow,
 }
 
 

@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+from pathlib import Path
 from layers_edx.element import Element, Composition
 from layers_edx.detector.eds_detector import (
     EDSDetector,
@@ -172,3 +173,21 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "epq_env: EPQ environment setup verification tests"
     )
+
+EPQ_PATH = "epq_dump"
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    path = Path(collection_path).resolve()
+
+    # detect regression suite
+    if EPQ_PATH not in path.parts:
+        return None
+
+    # allow if user explicitly asked for this file/dir
+    for arg in config.args:
+        arg_path = Path(arg)
+        if arg_path == path or EPQ_PATH in arg_path.parts:
+            return None
+
+    # otherwise ignore it
+    return True

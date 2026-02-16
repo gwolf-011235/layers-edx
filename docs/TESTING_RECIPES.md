@@ -76,31 +76,68 @@ public final class ElementDump implements DumpModule {
 - Extend `DumpModule` interface
 - Define a `CsvSchema` with `CsvColumn` entries:
   - Column name (lowercase with underscores)
-  - Column type (`INT`, `DOUBLE`, `STRING`, `BOOLEAN`)
+  - Column type (`INT`, `DOUBLE`, `STRING`, `BOOL`)
   - Whether the column is nullable (`true` for optional, `false` for required)
 - Implement `name()`: command name for CLI (e.g., "Element")
 - Implement `usage()`: human-readable help string
 - Implement `schema()`: returns the CSV schema
 - Implement `run()`: the logic
-  - Parse and validate arguments using `ctx.getInt()`, `ctx.getString()`, etc.
+  - Parse and validate arguments using `ctx.getInt()`, `ctx.getList()`, etc.
+  - Use helper utilities like `DumpUtils.parseElement()` where applicable
   - Use `CsvRowBuilder` to construct rows type-safely
   - Call `ctx.row()` to emit the row
   - Call `ctx.flush()` at the end
 
-#### 2. Register the Module in TestDump
-
-Open `test/java/src/main/java/epq/reference/TestDump.java` and find the `getDumpModules()` method:
+**Example with List Arguments and Utilities**:
 
 ```java
-private static Map<String, DumpModule> getDumpModules() {
-    return Map.ofEntries(
-        Map.entry("XRayTransition", new XRayTransitionDump()),
-        Map.entry("EdgeEnergy", new EdgeEnergyDump()),
-        Map.entry("Element", new ElementDump()),  // ADD THIS LINE
-        // ... other modules
-    );
+@Override
+public void run(DumpContext ctx) throws IllegalArgumentException {
+    // Parse comma-separated lists
+    List<String> elementNames = ctx.getList("elements");
+    List<String> fractionStrs = ctx.getList("fractions");
+
+    // Parse elements using DumpUtils
+    for (String elemName : elementNames) {
+        Element elm = DumpUtils.parseElement(elemName);  // Accepts symbol or Z
+        if (elm == null) {
+            throw new IllegalArgumentException("Unknown element: " + elemName);
+        }
+    }
+
+    // Handle nullable values
+    Double uncertainty = DumpUtils.sigma(uncertainValue);  // null if zero
+
+    // Build row with nullable column
+    rowBuilder.set("value", value)
+              .set("uncertainty", uncertainty);  // Can be null
 }
 ```
+
+See `DumpCompositionDetail` for a complete working example with list arguments.
+
+#### 2. Register the Module in TestDump
+
+Open `test/java/src/main/java/epq/reference/TestDump.java` and add your module to the `MODULES` stream:
+
+```java
+private static final Map<String, DumpModule> MODULES = Stream.of(
+        new DumpXRayTransition(),
+        new DumpElement(),
+        new DumpAtomicShell(),
+        new DumpCompositionDetail(),
+        new DumpCompositionSummary(),
+        new YourNewDumpModule()  // ADD THIS LINE
+    // add more here
+).collect(Collectors.toMap(DumpModule::name, m -> m));
+```
+
+**Current Registered Modules**:
+- `DumpXRayTransition` - X-ray transition properties
+- `DumpElement` - Element properties and atomic data
+- `DumpAtomicShell` - Atomic shell properties
+- `DumpCompositionDetail` - Per-element composition properties
+- `DumpCompositionSummary` - Aggregate composition properties
 
 #### 3. Compile and Test Locally
 
@@ -228,22 +265,36 @@ All EPQ dump data is validated using Pydantic models in `test.epq_dump.validator
 
 #### Available Validators
 
-| Model | Purpose |
-|-------|---------|
-| `ElementRow` | Single Element table row |
-| `XRayTransitionRow` | Single XRayTransition table row |
+All validators are registered in `test/epq_dump/validators.py` in the `_MODELS` dictionary.
+
+| Model | Dump Module | Purpose |
+|-------|-------------|--------|
+| `ElementRow` | `Element` | Element properties and atomic data |
+| `XRayTransitionRow` | `XRayTransition` | X-ray transition properties |
+| `AtomicShellRow` | `AtomicShell` | Atomic shell properties |
+| `CompositionDetailRow` | `CompositionDetail` | Per-element composition data |
+| `CompositionSummaryRow` | `CompositionSummary` | Aggregate composition properties |
 
 #### Import and Use
 
 ```python
-from test.epq_dump.validators import ElementRow, XRayTransitionRow, validate_table
+from test.epq_dump.validators import (
+    ElementRow,
+    XRayTransitionRow,
+    AtomicShellRow,
+    CompositionDetailRow,
+    CompositionSummaryRow,
+    validate_table
+)
 
-# In your test fixture
+# In your test - the fixture type annotation tells pytest which validator to use
 def test_element_data(java_dump: list[ElementRow]):
     # java_dump is automatically validated and typed as list[ElementRow]
     for element in java_dump:
         print(element.Z, element.symbol, element.name)
 ```
+
+**Note on Nullable Fields**: Fields with `| EmptyStrToNone` type accept `None` values. These correspond to nullable columns in the Java schema where empty strings represent null values.
 
 #### Model Attributes
 
@@ -265,12 +316,54 @@ def test_element_data(java_dump: list[ElementRow]):
 - `family: str` - Family name (e.g., "Ka")
 - `is_well_known: bool` - Whether transition is well-known
 - `exists: bool | None` - Whether transition exists (optional)
-- `energy_eV: float | None` - Transition energy in eV (optional)
+- `energy: float | None` - Transition energy in eV (optional)
 - `edge_energy_eV: float | None` - Edge energy in eV (optional)
 - `weight_default: float | None` - Default weight (optional)
 - `weight_family: float | None` - Family weight (optional)
 - `weight_destination: float | None` - Destination weight (optional)
 - `weight_klm: float | None` - KLM weight (optional)
+
+**AtomicShellRow**:
+- `Z: int` - Atomic number
+- `shell_index: int` - Shell index
+- `shell_name_siegbahn: str` - Siegbahn notation (e.g., "K", "L1")
+- `shell_name_iupac: str` - IUPAC notation
+- `shell_name_atomic: str` - Atomic notation
+- `family: str` - Shell family
+- `principal_quantum_number: int` - Principal quantum number (n)
+- `orbital_angular_momentum: int` - Orbital angular momentum (l)
+- `total_angular_momentum: float` - Total angular momentum (j)
+- `capacity: int` - Maximum electron capacity
+- `exists: bool | None` - Whether shell exists for this element (optional)
+- `ground_state_occupancy: int | None` - Ground state electron count (optional)
+- `edge_energy_ev: float | None` - Binding energy in eV (optional)
+- `energy_J: float | None` - Binding energy in Joules (optional)
+
+**CompositionDetailRow** (one row per element in composition):
+- `element: str` - Element symbol
+- `atomic_number: int` - Atomic number
+- `weight_fraction: float` - Mass fraction (unnormalized)
+- `weight_fraction_sigma: float | None` - Uncertainty (optional)
+- `normalized_weight_fraction: float` - Mass fraction (normalized to sum=1)
+- `normalized_weight_fraction_sigma: float | None` - Uncertainty (optional)
+- `atomic_percent: float` - Atomic percentage
+- `atomic_percent_sigma: float | None` - Uncertainty (optional)
+- `atoms_per_kg: float` - Number of atoms per kilogram
+- `atoms_per_kg_sigma: float | None` - Uncertainty (optional)
+- `stoichiometry: float` - Atomic fraction (stoichiometric coefficient)
+- `stoichiometry_sigma: float | None` - Uncertainty (optional)
+
+**CompositionSummaryRow** (single row for entire composition):
+- `element_count: int` - Number of elements
+- `weight_avg_atomic_number: float` - Weight-averaged atomic number
+- `weight_avg_atomic_number_sigma: float | None` - Uncertainty (optional)
+- `mean_atomic_number: float` - Mean atomic number
+- `mean_atomic_number_sigma: float | None` - Uncertainty (optional)
+- `sum_weight_fraction: float` - Sum of all weight fractions
+- `sum_weight_fraction_sigma: float | None` - Uncertainty (optional)
+- `optimal_representation: str` - Best representation type (STOICHIOMETRY, WEIGHT_PCT, UNDETERMINED)
+- `is_uncertain: bool` - Whether composition has uncertainties
+- `name: str | None` - Composition name if set (optional)
 
 ### Steps
 
@@ -857,6 +950,233 @@ mvn dependency:resolve
 
 ---
 
+### Symptom: Validator KeyError
+
+```
+KeyError: 'No pydantic model registered for dump module: CompositionDetail'
+```
+
+### Diagnosis and Fix
+
+The Pydantic validator model is not registered in `test/epq_dump/validators.py`.
+
+**Fix**:
+
+1. Check if the model class exists:
+
+```bash
+grep "class CompositionDetailRow" test/epq_dump/validators.py
+```
+
+2. If the class exists but isn't registered, add it to `_MODELS` dictionary:
+
+```python
+_MODELS: Dict[str, Type[BaseModel]] = {
+    "Element": ElementRow,
+    "XRayTransition": XRayTransitionRow,
+    "AtomicShell": AtomicShellRow,
+    "CompositionDetail": CompositionDetailRow,  # ADD THIS
+    "CompositionSummary": CompositionSummaryRow,
+}
+```
+
+3. If the class doesn't exist, create it following the pattern of existing models.
+
+---
+
+### Symptom: Pydantic ValidationError on Nullable Field
+
+```
+pydantic.ValidationError: 1 validation error for ElementRow
+ionization_energy
+  Input should be a valid number [type=float_type, input_value='', input_type=str]
+```
+
+### Diagnosis and Fix
+
+The Python model doesn't accept `None` but the Java CSV can return empty strings (representing null).
+
+**Fix**: Use `EmptyStrToNone` type annotation for nullable fields:
+
+```python
+from test.epq_dump.validators import EmptyStrToNone
+
+class ElementRow(BaseModel):
+    Z: int
+    ionization_energy: float | EmptyStrToNone  # Changed from: ionization_energy: float
+```
+
+This matches the Java schema where the column is marked nullable:
+
+```java
+new CsvColumn("ionization_energy", DOUBLE, true)  // nullable=true
+```
+
+---
+
+### Symptom: CSV Parsing Fails with Quoted Field
+
+```
+csv.Error: field larger than field limit (131072)
+```
+
+### Diagnosis and Fix
+
+This is unlikely but could occur if a field contains very large text. The `CsvWriter` automatically handles RFC 4180 escaping for:
+- Fields with commas
+- Fields with quotes (doubled)
+- Fields with newlines
+
+Check the Java stacktrace for the actual error. If the data is legitimately large, this may indicate a bug in the dump module (e.g., accidentally including large binary data).
+
+**Debug**:
+
+```bash
+# Run the dump module directly to inspect output
+cd test/java
+mvn exec:java -Dexec.mainClass=epq.reference.TestDump -Dexec.args="ModuleName arg=value" | head -20
+```
+
+---
+
+## Recipe: Test Compositions with List Arguments
+
+This recipe shows how to test dump modules that accept comma-separated list arguments (e.g., compositions).
+
+### Prerequisites
+
+- Java dump modules `CompositionDetail` and/or `CompositionSummary` exist
+- Corresponding Pydantic validators exist
+- You understand the basics of golden testing (see Recipe 2)
+
+### Pattern: Small Default Set, Large with FULL_SUITE
+
+For composition testing, use a pattern that provides fast feedback during development but comprehensive coverage in CI:
+
+```python
+import os
+from test.epq_dump.conftest import FULL_SUITE
+
+def get_params():
+    """Get test parameters based on FULL_SUITE environment variable."""
+    if FULL_SUITE:
+        # Comprehensive testing: 500 random compositions
+        return generate_random_compositions(count=500, seed=42)
+
+    # Fast feedback: Small hand-picked test set
+    return [
+        ("Fe", "1.0"),                    # Pure element
+        ("Fe,O", "0.72,0.28"),            # Binary: Iron oxide
+        ("Si,Al,O", "0.28,0.10,0.62"),    # Ternary: Feldspar
+    ]
+
+@pytest.mark.epq_ref(module="CompositionDetail")
+@pytest.mark.parametrize("elements,fractions", get_params())
+def test_composition(elements: str, fractions: str, java_dump: list[CompositionDetailRow]):
+    # Test logic here
+    pass
+```
+
+**Run in fast mode** (default):
+```bash
+pytest test/epq_dump/test_composition.py -v
+# Runs 3 tests
+```
+
+**Run in comprehensive mode**:
+```bash
+PYTEST_FULL_SUITE=true pytest test/epq_dump/test_composition.py -v
+# Runs 500 tests
+```
+
+### Complete Example: test_composition.py
+
+```python
+import pytest
+from test.epq_dump.validators import CompositionDetailRow
+from test.epq_dump.conftest import FULL_SUITE
+from layers_edx.composition import Composition
+
+def get_params():
+    if FULL_SUITE:
+        # Generate many random test cases
+        import random
+        random.seed(42)
+        cases = []
+        for _ in range(100):
+            num_elements = random.randint(2, 4)
+            elements = random.sample(["Fe", "O", "Si", "Al", "Ca", "Mg"], num_elements)
+            fractions = [random.uniform(0.1, 0.9) for _ in elements]
+            # Normalize
+            total = sum(fractions)
+            fractions = [f/total for f in fractions]
+
+            elem_str = ",".join(elements)
+            frac_str = ",".join(f"{f:.4f}" for f in fractions)
+            cases.append((elem_str, frac_str))
+        return cases
+
+    # Default: small focused test set
+    return [
+        ("Fe", "1.0"),
+        ("Fe,O", "0.72,0.28"),
+        ("Si,Al,O", "0.28,0.10,0.62"),
+    ]
+
+@pytest.mark.epq_ref(module="CompositionDetail")
+@pytest.mark.parametrize("elements,fractions", get_params())
+def test_weight_fractions(elements: str, fractions: str, java_dump: list[CompositionDetailRow]):
+    """Verify weight fractions match Java reference."""
+    # Parse input
+    elem_list = elements.split(",")
+    frac_list = [float(f) for f in fractions.split(",")]
+
+    # Create Python composition
+    py_comp = Composition.from_mass_fractions(
+        dict(zip(elem_list, frac_list))
+    )
+
+    # Compare each element
+    assert len(java_dump) == len(elem_list)
+    for row in java_dump:
+        py_frac = py_comp.get_weight_fraction(row.element)
+        assert py_frac == pytest.approx(row.weight_fraction, rel=1e-9)
+```
+
+### Testing with Different Fraction Modes
+
+The composition dump modules support both weight fractions and mole fractions (stoichiometry). You can parametrize tests to verify both modes:
+
+```python
+@pytest.mark.epq_ref(module="CompositionDetail")
+@pytest.mark.parametrize("elements,fractions,mode", [
+    # Weight-based compositions
+    ("Fe,O", "0.6994,0.3006", "weight"),
+    ("Ca,C,O", "0.400,0.120,0.480", "weight"),
+
+    # Mole-based compositions (stoichiometry)
+    ("Fe,O", "2,3", "mole"),           # Fe₂O₃
+    ("Ca,C,O", "1,1,3", "mole"),       # CaCO₃
+    ("H,O", "2,1", "mole"),            # H₂O
+])
+def test_composition_modes(elements: str, fractions: str, mode: str,
+                          java_dump: list[CompositionDetailRow]):
+    """Test compositions defined by weight or mole fractions."""
+    # The mode affects input interpretation, but output is always the same
+    # Fe₂O₃ by mole (2,3) produces same result as by weight (0.6994,0.3006)
+
+    elem_list = elements.split(",")
+    assert len(java_dump) == len(elem_list)
+
+    # Verify all elements are present
+    dumped_elements = {row.element for row in java_dump}
+    assert dumped_elements == set(elem_list)
+```
+
+**See Also**: `test/epq_dump/test_composition.py` for complete working examples with the `generate_random_compositions()` helper function.
+
+---
+
 ## Recipe: Run Tests Without JVM
 
 Sometimes you want to test your Python implementation without invoking Java (e.g., during rapid iteration).
@@ -918,4 +1238,12 @@ pytest test/python/test_element.py::test_element_mock -v
 | Write a golden test | Recipe 2 |
 | Debug a failing test | Recipe 3 |
 | Fix Java invocation issues | Recipe 4 |
-| Test without JVM | Recipe 5 |
+| Test compositions with list arguments | Recipe 5 (new) |
+| Run tests without JVM | Recipe 6 |
+
+## See Also
+
+- [COMPOSITION_TESTING_GUIDE.md](COMPOSITION_TESTING_GUIDE.md) - Comprehensive guide to composition testing
+- [JAVA_ORACLE_GUIDE.md](JAVA_ORACLE_GUIDE.md) - Complete Java API reference
+- [PYTEST_BRIDGE_GUIDE.md](PYTEST_BRIDGE_GUIDE.md) - Pytest integration details
+- [TESTING_ARCHITECTURE.md](TESTING_ARCHITECTURE.md) - Design principles and architecture

@@ -7,11 +7,16 @@ from test.epq_dump.csv_parser import parse_epq_batch_output
 from test.epq_dump.core_models import DumpRequest, DumpArgs, CsvTable
 from test.epq_dump.validators import validate_table
 from pydantic import BaseModel
+import os
 
 
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers"""
     config.addinivalue_line("markers", "epq_ref: test requires EPQ reference output")
+
+
+# Global flag to control whether to run the full suite or a reduced set of tests
+FULL_SUITE = os.getenv("PYTEST_FULL_SUITE", "false").lower() == "true"
 
 
 # Global cache to store Java results for the duration of the session

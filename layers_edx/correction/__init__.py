@@ -19,7 +19,6 @@ class Correction(ABC):
         shell: AtomicShell,
         properties: SpectrumProperties,
     ):
-        composition.normalize()
         self._composition = composition
         self._shell = shell
         self._properties = properties

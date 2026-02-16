@@ -18,7 +18,7 @@ public final class DumpXRayTransition implements DumpModule {
             new CsvColumn("family", STRING, false),
             new CsvColumn("is_well_known", BOOL, false),
             new CsvColumn("exists", BOOL, true),
-            new CsvColumn("energy_eV", DOUBLE, true),
+            new CsvColumn("energy", DOUBLE, true),
             new CsvColumn("edge_energy_eV", DOUBLE, true),
             new CsvColumn("weight_default", DOUBLE, true),
             new CsvColumn("weight_family", DOUBLE, true),
@@ -68,11 +68,15 @@ public final class DumpXRayTransition implements DumpModule {
             return;
         }
 
-        final boolean exists = xrt.exists();
-
+        Boolean exists = null;
+        try {
+            exists = xrt.exists();
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // Shell index out of bounds for element
+        }
         rowBuilder.set("exists", exists);
 
-        if (!exists) {
+        if (exists == null || !exists) {
             ctx.row(rowBuilder.buildRow());
             ctx.flush();
             return;
@@ -80,7 +84,7 @@ public final class DumpXRayTransition implements DumpModule {
 
         try {
             rowBuilder
-                    .set("energy_eV", xrt.getEnergy_eV())
+                    .set("energy", xrt.getEnergy())
                     .set("edge_energy_eV", xrt.getEdgeEnergy())
                     .set("weight_default", xrt.getWeight(XRayTransition.NormalizeDefault))
                     .set("weight_family", xrt.getWeight(XRayTransition.NormalizeFamily))

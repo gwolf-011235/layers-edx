@@ -78,6 +78,19 @@ class EdgeEnergy:
 
     @classmethod
     def compute(cls, shell: AtomicShell) -> float:
+        """
+        Compute edge energy for a given atomic shell by consulting multiple databases.
+
+        This method attempts to find the edge energy by querying databases in priority
+        order: Chantler2005, Williams2011, NIST, and DTSA. The first database that
+        returns a positive value is used.
+
+        :param shell: The atomic shell for which to compute the edge energy
+        :type shell: AtomicShell
+        :return: The edge energy in eV, or NaN if no valid value is found in any
+            database
+        :rtype: float
+        """
         databases: list[Type[EdgeEnergy.Database]] = [
             cls.Chantler2005,
             cls.Williams2011,
@@ -402,6 +415,15 @@ class AtomicShell:
 
     @property
     def edge_energy(self) -> float:
+        """
+        Get the edge energy for this atomic shell.
+
+        The edge energy is computed by consulting multiple databases in priority
+        order. If no valid value is found, returns NaN.
+
+        :return: The edge energy in eV, or NaN if unavailable
+        :rtype: float
+        """
         return EdgeEnergy.compute(self)
 
     @property
@@ -414,4 +436,12 @@ class AtomicShell:
 
     @property
     def exists(self) -> bool:
-        return self.energy > 0.0
+        """
+        Check if this atomic shell exists for its element.
+
+        A shell is considered to exist if it has a non-zero edge energy
+
+        :return: True if the shell exists, False otherwise
+        :rtype: bool
+        """
+        return self.edge_energy > 0.0

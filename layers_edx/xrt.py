@@ -248,7 +248,7 @@ DESTINATION_SHELL = [
         "NV",
     ]
 ]
-LINE_WEIGHT: llf = read_csv("LineWeights", row_offset=1)
+LINE_WEIGHT: llf = read_csv("LineWeights", row_offset=1, value_offset=1)
 
 
 def transition_from_name(name: str) -> int:
@@ -279,10 +279,10 @@ def family_from_transition(transition: int) -> int:
 
 def weight_normalization(weights_list: llf) -> tuple[llf, llf, llf]:
     dest_len = AtomicShell.from_name("NV") - AtomicShell.from_name("K") + 1
-    dest_norm = [[0.0] * dest_len] * len(weights_list)
+    dest_norm = [[0.0] * dest_len for _ in range(len(weights_list))]
     fam_len = AtomicShell.family_from_name("N") - AtomicShell.family_from_name("K") + 1
-    fam_norm = [[0.0] * fam_len] * len(weights_list)
-    klm_norm = [[0.0] * fam_len] * len(weights_list)
+    fam_norm = [[0.0] * fam_len for _ in range(len(weights_list))]
+    klm_norm = [[0.0] * fam_len for _ in range(len(weights_list))]
     for atomic_number, weights in enumerate(weights_list[1:], start=1):
         for transition, weight in enumerate(weights):
             destination = destination_shell_from_transition(transition)
@@ -299,7 +299,7 @@ def weight_normalization(weights_list: llf) -> tuple[llf, llf, llf]:
                 fam_norm[atomic_number][family] = 1.0
             if klm_norm[atomic_number][family] == 0.0:
                 klm_norm[atomic_number][family] = 1.0
-    return dest_norm, fam_norm, klm_norm
+    return fam_norm, dest_norm, klm_norm
 
 
 FAMILY_NORM, DESTINATION_NORM, KLM_NORM = weight_normalization(LINE_WEIGHT)
@@ -362,7 +362,7 @@ class XRayTransition:
         elif atomic_number in [
             Element.from_name("Tc"),
             Element.from_name("Ru"),
-            Element.from_name("Th"),
+            Element.from_name("Rh"),
             Element.from_name("Pd"),
             Element.from_name("Ag"),
         ]:

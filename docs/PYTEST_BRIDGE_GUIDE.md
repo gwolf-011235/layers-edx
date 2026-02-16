@@ -218,19 +218,108 @@ Uses pytest's StashKey to retrieve the DumpRequest stored during collection phas
 
 The `java_dump` fixture automatically validates CSV data using Pydantic models. Each dump module has a corresponding Pydantic model that defines the expected schema.
 
-The project includes validators in `test/epq_dump/validators.py`. For example, the `XRayTransition` dump uses the `XRayTransitionRow` model:
+### Available Validators
+
+All validators are defined in `test/epq_dump/validators.py` and registered in the `_MODELS` dictionary:
 
 ```python
-from pydantic import BaseModel
-
-class XRayTransitionRow(BaseModel):
-    source_shell: str
-    destination_shell: str
-    family: str
-    is_well_known: bool
-    exists: bool
-    # ... other fields
+_MODELS: Dict[str, Type[BaseModel]] = {
+    "Element": ElementRow,
+    "XRayTransition": XRayTransitionRow,
+    "AtomicShell": AtomicShellRow,
+    "CompositionDetail": CompositionDetailRow,
+    "CompositionSummary": CompositionSummaryRow,
+}
 ```
+
+#### Validator Models
+
+**ElementRow** - Element properties:
+- `Z: int` - Atomic number
+- `symbol: str` - Element symbol
+- `name: str` - Element name
+- `atomic_weight: float` - Atomic weight in u
+- `mass_in_kg: float` - Mass in kilograms
+- `ionization_energy: float | EmptyStrToNone` - Ionization energy (nullable)
+- `mean_ionization_potential: float` - Mean ionization potential
+
+**XRayTransitionRow** - X-ray transition properties:
+- `Z: int`, `transition_index: int`, `transition_name: str`
+- `source_shell: str`, `destination_shell: str`, `family: str`
+- `is_well_known: bool`
+- `exists: bool | EmptyStrToNone` - Whether transition exists (nullable)
+- `energy: float | EmptyStrToNone` - Transition energy (nullable)
+- Multiple weight fields (all nullable)
+
+**AtomicShellRow** - Atomic shell properties:
+- `Z: int`, `shell_index: int`
+- `shell_name_siegbahn: str`, `shell_name_iupac: str`, `shell_name_atomic: str`
+- `family: str`
+- Quantum numbers: `principal_quantum_number`, `orbital_angular_momentum`, `total_angular_momentum`
+- `capacity: int`, `exists: bool | EmptyStrToNone`
+- Energy fields (all nullable)
+
+**CompositionDetailRow** - Per-element composition data:
+- `element: str`, `atomic_number: int`
+- `weight_fraction: float`, `weight_fraction_sigma: float | EmptyStrToNone`
+- Normalized fractions, atomic percent, atoms per kg, stoichiometry
+- All uncertainty fields are nullable
+
+**CompositionSummaryRow** - Aggregate composition properties:
+- `element_count: int`
+- `weight_avg_atomic_number: float`, with sigma (nullable)
+- `mean_atomic_number: float`, with sigma (nullable)
+- `sum_weight_fraction: float`, with sigma (nullable)
+- `optimal_representation: str`, `is_uncertain: bool`, `name: str | EmptyStrToNone`
+
+### EmptyStrToNone Type
+
+Java represents `null` as an empty string in CSV output. The `EmptyStrToNone` type alias handles this conversion:
+
+```python
+def _empty_str_to_none(v: str | None) -> str | None:
+    if v is None or v == "":
+        return None
+    raise ValueError("Value is not empty")
+
+EmptyStrToNone: TypeAlias = Annotated[None, BeforeValidator(_empty_str_to_none)]
+```
+
+**Usage in models**:
+
+```python
+class ElementRow(BaseModel):
+    ionization_energy: float | EmptyStrToNone  # Can be None
+```
+
+This matches the Java schema where the column is nullable:
+
+```java
+new CsvColumn("ionization_energy", DOUBLE, true)  // nullable=true
+```
+
+### validate_table() Function
+
+The `validate_table()` function is called automatically by the `java_dump` fixture:
+
+```python
+def validate_table(module: str, table: CsvTable) -> list[BaseModel]:
+    """Validate a Java CSV dump table against registered Pydantic model."""
+    model = _MODELS.get(module)
+    if model is None:
+        raise KeyError(f"No pydantic model registered for dump module: {module}")
+
+    # Validate each row
+    validated_rows = [model(**row) for row in table]
+    return validated_rows
+```
+
+**Error Handling**:
+- Raises `KeyError` if no model is registered for the module
+- Raises `pydantic.ValidationError` if CSV data doesn't match schema
+- Provides detailed error messages with field names and expected types
+
+### Example Usage
 
 The validation happens automatically in the fixture—you receive already-validated model instances:
 
@@ -246,6 +335,10 @@ def test_xray_transition_schema(Z: int, trans: int, java_dump: list[XRayTransiti
     # Access validated model attributes directly
     assert java_dump[0].source_shell
     assert java_dump[0].family in ["K", "L", "M"]
+
+    # Nullable fields may be None
+    if java_dump[0].energy is not None:
+        assert java_dump[0].energy > 0
 ```
 
 
@@ -324,6 +417,99 @@ def test_combinations(Z: int, trans: int, shell: str, java_dump: list[XRayTransi
 Each combination generates a unique `DumpRequest`, but Java processes all at once.
 
 ---
+
+## Test Coverage Modes
+
+By default, the pytest bridge tests a **reduced suite** of parameters to ensure fast feedback during development. For comprehensive validation, you can enable the **full suite** mode.
+
+### Reduced Suite (Default)
+
+The reduced suite tests only selected parameter combinations.
+
+**Run reduced suite**:
+
+```bash
+pytest -m epq_ref
+```
+
+This is the default and runs quickly.
+
+### Full Suite
+
+The full suite comprehensively tests all possible parameter combinations:
+
+- **Element tests**: 109 elements (Z=1 to 109)
+- **AtomicShell tests**: 109 elements × 49 shell indices = 5,341 test cases
+- **XRayTransition tests**: 109 elements × 76 transition indices = 8,284 test cases
+
+The full suite is significantly slower. Use this mode for:
+- Final validation before release
+- Comprehensive verification on CI/CD pipelines
+- Debugging edge cases across the entire periodic table
+
+**Run full suite**:
+
+```bash
+PYTEST_FULL_SUITE=true pytest -m epq_ref
+```
+
+### Environment Variable
+
+The `PYTEST_FULL_SUITE` environment variable is defined in `test/epq_dump/conftest.py`:
+
+```python
+FULL_SUITE = os.getenv("PYTEST_FULL_SUITE", "false").lower() == "true"
+```
+
+This constant is imported by test files to select which parameter combinations to test.
+
+### Pattern: Conditional Parametrization
+
+The recommended pattern uses a `get_params()` function that returns different parameter sets based on `FULL_SUITE`:
+
+```python
+from test.epq_dump.conftest import FULL_SUITE
+
+def get_params():
+    """Return test parameters based on FULL_SUITE."""
+    if FULL_SUITE:
+        # Comprehensive: all elements
+        return list(range(1, 119))
+
+    # Default: representative sample
+    return [1, 6, 26, 79, 92]  # H, C, Fe, Au, U
+
+@pytest.mark.epq_ref(module="Element")
+@pytest.mark.parametrize("Z", get_params())
+def test_element(Z: int, java_dump: list[ElementRow]):
+    # Test logic
+    pass
+```
+
+### Real-World Examples
+
+**test_element.py** - Sample vs exhaustive:
+```python
+def get_params():
+    if FULL_SUITE:
+        return list(range(1, 119))  # All 118 elements
+    return [1, 6, 26, 79, 92]       # 5 representative elements
+```
+
+**test_composition.py** - Structured vs randomized:
+```python
+def get_params():
+    if FULL_SUITE:
+        # 500 random compositions
+        return generate_random_compositions(count=500, seed=42)
+
+    # Hand-picked test cases
+    return [
+        ("Fe", "1.0"),              # Pure element
+        ("Fe,O", "0.72,0.28"),      # Binary compound
+        ("Si,Al,O", "0.28,0.10,0.62"),  # Ternary
+    ]
+```
 
 ## Troubleshooting
 

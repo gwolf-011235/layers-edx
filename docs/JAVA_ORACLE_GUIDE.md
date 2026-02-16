@@ -1,6 +1,6 @@
 # Java Oracle Guide
 
-This document is a complete reference for the Java components that implement the CLI program wich acts as reference oracle.
+This document is a complete reference for the Java components that implement the CLI program which acts as reference oracle.
 
 ## Overview
 
@@ -242,6 +242,21 @@ Arguments must be of the form `key=value`.
 
 ### Argument Access
 
+`DumpContext` provides an API for accessing command-line arguments with built-in validation.
+
+#### API Reference
+
+| Method | Description |
+|--------|-------------|
+| `String get(String key)` | Get required string argument; throws if missing |
+| `String getOrDefault(String key, String default)` | Get optional string argument with default value |
+| `int getInt(String key)` | Parse required integer argument; throws if missing or invalid |
+| `int getInt(String key, int min, int max)` | Parse and validate integer within range [min, max] |
+| `List<String> getList(String key)` | Parse comma-separated list; each element trimmed |
+| `Map<String, String> args()` | Get read-only view of all arguments in insertion order |
+
+#### Examples
+
 ```java
 // Required argument - throws if not present
 String z = ctx.get("Z");
@@ -255,6 +270,9 @@ int z_int = ctx.getInt("Z");
 // Required integer argument with range validation
 int z_validated = ctx.getInt("Z", 1, 118);  // min=1, max=118; throws if out of range
 
+// Comma-separated list
+List<String> elements = ctx.getList("elements");  // "Fe,O,Si" → ["Fe", "O", "Si"]
+
 // Read-only view of all arguments
 Map<String, String> args = ctx.args();
 ```
@@ -262,6 +280,38 @@ Map<String, String> args = ctx.args();
 ### CSV Output
 
 `DumpContext` exposes an instance of `CsvWriter` through methods `header()`, `row()` and `flush()`.
+
+## DumpUtils
+
+`DumpUtils` provides **shared utility methods** used across multiple dump modules. Located at `test/java/src/main/java/epq/reference/DumpUtils.java`.
+
+### API Reference
+
+#### parseElement(String input)
+
+Parse an element from either a symbol or atomic number string.
+
+```java
+public static Element parseElement(String input)
+```
+
+**Accepts**:
+- Element symbols: `"Fe"`, `"Au"`, `"Si"`
+- Atomic numbers as strings: `"26"`, `"79"`, `"14"`
+
+**Returns**: `Element` object, or `null` if not found
+
+#### sigma(UncertainValue2 uv)
+
+Extract uncertainty (sigma) from EPQ's `UncertainValue2`, returning `null` if zero or unavailable.
+
+```java
+public static Double sigma(UncertainValue2 uv)
+```
+
+**Purpose**: Convert zero uncertainties to `null` for cleaner CSV output (empty cell instead of `0.000000000000e+00`)
+
+**Returns**: `Double` with uncertainty value, or `null` if uncertainty is zero
 
 ## Deterministic CSV Output: Four-Class Design
 
@@ -301,14 +351,6 @@ Immutable record holding an ordered list of columns.
 
 Stateful builder that enforces schema compliance during row construction.
 
-```java
-CsvRowBuilder builder = new CsvRowBuilder(schema);
-builder.set("Z", 26)
-       .set("Energy", 6403.9)
-       .set("OccupancyNumber", 2);
-String[] row = builder.buildRow();  // Order matches schema, not insertion order
-```
-
 **Responsibilities**:
 - Validate column names against schema (throw `IllegalArgumentException` if unknown)
 - Enforce type safety: `set()` accepts `Object`; `buildRow()` serializes by column type
@@ -316,16 +358,72 @@ String[] row = builder.buildRow();  // Order matches schema, not insertion order
 - **Key invariant**: `buildRow()` outputs columns in schema order, not insertion order
 - Serialize values using locale-independent formatting
 
+**Complete Example**:
+
+```java
+CsvRowBuilder builder = new CsvRowBuilder(schema);
+builder.set("Z", 26)                    // INT
+       .set("Energy", 6403.9)            // DOUBLE
+       .set("OccupancyNumber", 2);       // INT
+String[] row = builder.buildRow();       // Order matches schema, not insertion order
+```
+
+**Null Handling**:
+
+```java
+// Schema with nullable column
+static final CsvSchema SCHEMA = new CsvSchema(
+    new CsvColumn("Z", INT, false),                  // Required
+    new CsvColumn("ionization_energy", DOUBLE, true) // Optional (nullable)
+);
+
+// Set null value for optional column
+Double ionizationEnergy = null;  // Not available for this element
+try {
+    ionizationEnergy = element.getIonizationEnergy();
+} catch (EPQFatalException e) {
+    // Leave as null
+}
+
+builder.set("Z", Z)
+       .set("ionization_energy", ionizationEnergy);  // null is OK for nullable column
+
+String[] row = builder.buildRow();
+// Result: ["26", ""]  - null serializes to empty string
+```
+
+**Type-Safe Serialization**:
+
+| Java Type | CSV Output | Format |
+|-----------|------------|--------|
+| `Integer` | `"26"` | Plain integer |
+| `Double` | `"6.403900000000e+03"` | Scientific notation (12 decimal places) |
+| `String` | `"Iron"` | As-is |
+| `Boolean` | `"true"` or `"false"` | Lowercase |
+| `null` (nullable column) | `""` | Empty string |
+
 ### CsvWriter
 
-Writes header and rows to output stream.
+Writes header and rows to output stream with RFC 4180-compliant escaping.
 
 **Responsibilities**:
 - Write CSV header from schema
 - Write data rows with comma separation
 - Auto-write header before first row if not explicitly written
-- Never quote values (simplifies parsing)
+- Escape fields containing commas, quotes, or newlines per RFC 4180
 - Flush output when requested
+
+**Field Escaping (RFC 4180)**:
+
+```java
+// Fields with special characters are automatically quoted and escaped
+"Simple value"     → Simple value      // No quotes needed
+"Has, comma"       → "Has, comma"      // Quoted
+"Has "quote""      → "Has ""quote"""  // Internal quotes doubled
+"Has\nnewline"     → "Has\nnewline"    // Quoted
+```
+
+Python's `csv.DictReader()` automatically handles these escapes during parsing.
 
 ### Design Invariants
 

@@ -54,7 +54,7 @@ def test_composition_creation_atomic():
 
 def test_composition_normalization():
     fe = Element("Fe")
-    comp = Composition([fe], [0.5], normalize=True)
+    comp = Composition([fe], [0.5])
     assert comp.weight_fractions[fe] == 1.0
 
 
