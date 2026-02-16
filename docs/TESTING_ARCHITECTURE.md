@@ -94,10 +94,89 @@ CSV is the contract between Java and Python. It was chosen because:
 ### CSV Guarantees
 
 1. **Fixed column order**: Determined by the `DumpModule` at emission time
-2. **Locale independence**: Uses `Locale.ROOT` for formatting
-3. **Scientific notation**: Floating-point numbers use `"%.12e"` format
+2. **Locale independence**: Uses `Locale.ROOT` for formatting (decimal point, not comma)
+3. **Scientific notation**: Floating-point numbers use `"%.12e"` format (12 decimal places)
 4. **Header row**: First row names all columns
-5. **No embedded quotes**: Values are never quoted (simplifies parsing)
+5. **RFC 4180 compliance**: Fields with commas, quotes, or newlines are properly escaped
+6. **Null representation**: `null` values serialize as empty strings
+
+### Floating-Point Format
+
+All `DOUBLE` type columns use scientific notation with 12 decimal places:
+
+```java
+String.format(Locale.ROOT, "%.12e", value)
+```
+
+**Example output**:
+```csv
+Z,energy_eV,atomic_weight
+26,6.403900000000e+03,5.584500000000e+01
+```
+
+**Why 12 decimal places?**
+
+12 decimal places provides sufficient precision for all physical constants and measurements in EPQ:
+- Energy values: typically 1-100 keV (requires ~6-7 significant figures)
+- Mass values: atomic weights (requires ~10 significant figures)
+- IEEE 754 double precision: ~15-17 decimal digits
+- 12 decimal places in scientific notation preserves full precision while remaining human-readable
+
+**Locale independence**:
+
+Using `Locale.ROOT` ensures:
+- Decimal point (`.`) not comma (`,`) regardless of system locale
+- Consistent parsing across different regional settings
+- Reproducible output on all systems
+
+### Null Handling
+
+Null values in Java are represented as **empty strings** in CSV output.
+
+**Java side** - Nullable columns:
+```java
+// Schema definition
+static final CsvSchema SCHEMA = new CsvSchema(
+    new CsvColumn("Z", INT, false),                  // Required
+    new CsvColumn("ionization_energy", DOUBLE, true) // Nullable
+);
+
+// Setting null value
+Double ionizationEnergy = null;  // Not available
+rowBuilder.set("ionization_energy", ionizationEnergy);
+
+// CSV output: Z,ionization_energy\n26,\n
+// Empty string represents null
+```
+
+**Python side** - Pydantic validation:
+```python
+from test.epq_dump.validators import EmptyStrToNone
+
+class ElementRow(BaseModel):
+    Z: int
+    ionization_energy: float | EmptyStrToNone  # Accepts None
+```
+
+**The `EmptyStrToNone` type**:
+
+```python
+def _empty_str_to_none(v: str | None) -> str | None:
+    if v is None or v == "":
+        return None
+    raise ValueError("Value is not empty")
+
+EmptyStrToNone: TypeAlias = Annotated[None, BeforeValidator(_empty_str_to_none)]
+```
+
+This type annotation converts empty strings to `None` during Pydantic validation.
+
+**Design rationale**:
+
+1. **CSV simplicity**: No special null marker needed (e.g., `NULL`, `N/A`)
+2. **Standard compliance**: Empty fields are standard CSV practice
+3. **Type safety**: Pydantic enforces correct null handling on Python side
+4. **Java utility**: `DumpUtils.sigma()` returns `null` for zero uncertainties, producing clean CSV
 
 ### Example
 
