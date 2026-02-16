@@ -1,3 +1,5 @@
+import random
+
 import pytest
 from pytest import approx  # type: ignore
 from test.epq_dump.validators import LenardCoefficientRow
@@ -5,12 +7,18 @@ from layers_edx.element import Element
 from layers_edx.xrt import XRayTransition
 from layers_edx.material_properties.lc import LeonardCoefficient
 from layers_edx.units import ToSI
+from test.epq_dump.conftest import FULL_SUITE
 
 
-@pytest.mark.epq_ref(module="LenardCoefficient")
-@pytest.mark.parametrize(
-    "beam_energy, Z, trans, algo",
-    [
+def get_params():
+    """
+    Get parameters for Leonard coefficient tests.
+    Returns tuples of (beam_energy, Z, trans, algo).
+    """
+    if FULL_SUITE:
+        return get_random_params(count=500, seed=42)
+
+    test_cases = [
         # Silicon K-alpha at various energies
         (10.0, 14, 0, "Heinrich"),
         (15.0, 14, 0, "Heinrich"),
@@ -30,7 +38,111 @@ from layers_edx.units import ToSI
         (15.0, 13, 0, "Heinrich"),  # Aluminum K-alpha
         (20.0, 22, 0, "Heinrich"),  # Titanium K-alpha
         (25.0, 47, 0, "Heinrich"),  # Silver K-alpha
-    ],
+    ]
+    return test_cases
+
+
+def generate_random_lenard_coefficient_params(
+    count: int,
+    beam_energy_range: tuple[float, float] = (10.0, 30.0),
+    element_range: tuple[int, int] = (11, 79),
+    transition_range: tuple[int, int] = (0, 10),
+    algorithms: list[str] | None = None,
+    seed: int | None = None,
+) -> list[tuple[float, int, int, str]]:
+    """Generate random Leonard coefficient test cases.
+
+    Args:
+        count: Number of test cases to generate
+        beam_energy_range: Tuple of (min_keV, max_keV) for beam energy
+            (default: (10.0, 30.0))
+        element_range: Tuple of (min_Z, max_Z) for element atomic numbers
+            (default: (11, 79) - Sodium to Gold)
+        transition_range: Tuple of (min_trans, max_trans) for transition indices
+            (default: (0, 10))
+        algorithms: List of algorithms to randomly choose from
+            (default: ["Heinrich"])
+        seed: Random seed for reproducibility (default: None)
+
+    Returns:
+        List of tuples in format: [(beam_energy, Z, trans, algo), ...]
+        where beam_energy is in keV, Z is atomic number, trans is transition
+        index, and algo is the algorithm name.
+
+    Examples:
+        # Generate 10 test cases with default parameters and seed
+        >>> cases = generate_random_lenard_coefficient_params(count=10, seed=42)
+
+        # Generate test cases with specific energy and element ranges
+        >>> cases = generate_random_lenard_coefficient_params(
+        ...     count=20,
+        ...     beam_energy_range=(15.0, 25.0),
+        ...     element_range=(13, 29),
+        ...     seed=123
+        ... )
+    """
+    if seed is not None:
+        random.seed(seed)
+
+    if algorithms is None:
+        algorithms = ["Heinrich"]
+
+    # Enforce constraints
+    if beam_energy_range[0] >= beam_energy_range[1]:
+        raise ValueError(
+            f"Invalid beam_energy_range: min ({beam_energy_range[0]}) must be less than "
+            f"max ({beam_energy_range[1]})"
+        )
+
+    if element_range[0] > element_range[1]:
+        raise ValueError(
+            f"Invalid element_range: min ({element_range[0]}) > max ({element_range[1]})"
+        )
+
+    test_cases: list[tuple[float, int, int, str]] = []
+
+    for _ in range(count):
+        # Random beam energy
+        beam_energy = random.uniform(beam_energy_range[0], beam_energy_range[1])
+
+        # Random atomic number
+        Z = random.randint(element_range[0], element_range[1])
+
+        # Random transition index
+        # For lighter elements (Z < 30), prefer K transitions (0-10)
+        # For heavier elements, allow L and M transitions (0-30)
+        if Z < 30:
+            trans = random.randint(0, min(10, transition_range[1]))
+        else:
+            trans = random.randint(transition_range[0], transition_range[1])
+
+        # Random algorithm
+        algo = random.choice(algorithms)
+
+        test_cases.append((beam_energy, Z, trans, algo))
+
+    return test_cases
+
+
+def get_random_params(
+    count: int = 10, seed: int = 42
+) -> list[tuple[float, int, int, str]]:
+    """Get random Leonard coefficient test parameters with sensible defaults.
+
+    Args:
+        count: Number of test cases to generate (default: 10)
+        seed: Random seed for reproducibility (default: 42)
+
+    Returns:
+        List of tuples in format: [(beam_energy, Z, trans, algo), ...]
+    """
+    return generate_random_lenard_coefficient_params(count=count, seed=seed)
+
+
+@pytest.mark.epq_ref(module="LenardCoefficient")
+@pytest.mark.parametrize(
+    "beam_energy, Z, trans, algo",
+    get_params(),
 )
 class TestLenardCoefficientHeinrich:
     """
