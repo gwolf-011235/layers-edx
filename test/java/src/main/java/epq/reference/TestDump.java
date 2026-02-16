@@ -29,7 +29,8 @@ public final class TestDump {
 
     private static final Map<String, DumpModule> MODULES = Stream.of(
             new DumpXRayTransition(),
-            new DumpElement()
+            new DumpElement(),
+            new DumpLenardCoefficient()
     // add more here
     ).collect(Collectors.toMap(DumpModule::name, m -> m));
 
