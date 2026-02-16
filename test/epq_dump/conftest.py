@@ -1,4 +1,5 @@
 from typing import Iterable, cast
+import os
 import pytest
 from pytest import StashKey
 import subprocess
@@ -12,6 +13,10 @@ from pydantic import BaseModel
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers"""
     config.addinivalue_line("markers", "epq_ref: test requires EPQ reference output")
+
+
+# Global flag to control whether to run the full suite or a reduced set of tests
+FULL_SUITE = os.getenv("PYTEST_FULL_SUITE", "false").lower() == "true"
 
 
 # Global cache to store Java results for the duration of the session
