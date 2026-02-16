@@ -240,15 +240,16 @@ class Composition:
         """
         Normalize fractions so their sum equals 1.
 
-        Raises
-        ------
-        ValueError
-            If the sum of fractions is zero.
+        If the input sequence is empty, an empty list is returned. If the sum
+        of the fractions is zero, a list of zeros of equal length is returned.
+
         """
-        fractions_sum = sum(fractions)
-        if fractions_sum == 0:
-            raise ValueError("Cannot normalize fractions with sum of zero.")
-        return [fraction / fractions_sum for fraction in fractions]
+        if not fractions:
+            return []
+        s = sum(fractions)
+        if s == 0:
+            return [0.0 for _ in fractions]
+        return [f / s for f in fractions]
 
     @staticmethod
     def atomic_from_weight(
@@ -293,9 +294,6 @@ class Composition:
 
         if len(self._elements) != len(fractions):
             raise ValueError("elements and fractions must have same length")
-
-        if not self._elements:
-            raise ValueError("composition cannot be empty")
 
         if weight:
             self._weight_fractions = fractions
