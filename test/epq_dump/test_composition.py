@@ -8,19 +8,25 @@ from test.epq_dump.conftest import FULL_SUITE
 
 
 def get_params():
-    """Get parameters for composition tests.
-
-    Format: (elements_str, fractions_str)
+    """
+    Get parameters for composition tests.
+    Returns tuples of (elements, fractions, mode).
     """
     if FULL_SUITE:
         return get_random_params(count=500, seed=42)
 
     test_cases = [
-        ("Fe", "1.0"),  # Pure element
-        ("Fe,O", "0.72,0.28"),  # Binary: Iron oxide
-        ("Si,Al,O", "0.28,0.10,0.62"),  # Ternary: Feldspar
-        ("C,H,O", "0.5,0.3,0.2"),  # Ternary: Organic
-        ("Fe,Ni,Co", "0.5,0.3,0.2"),  # Ternary: Alloy
+        # Weight-based compositions (default mode)
+        ("Fe", "1.0", "weight"),  # Pure element
+        ("Fe,O", "0.72,0.28", "weight"),  # Binary: Iron oxide
+        ("Si,Al,O", "0.28,0.10,0.62", "weight"),  # Ternary: Feldspar
+        ("C,H,O", "0.5,0.3,0.2", "weight"),  # Ternary: Organic
+        ("Fe,Ni,Co", "0.5,0.3,0.2", "weight"),  # Ternary: Alloy
+        # Mole-based compositions (stoichiometric)
+        ("Fe,O", "2,3", "mole"),  # Fe₂O₃ - Iron(III) oxide
+        ("Ca,C,O", "1,1,3", "mole"),  # CaCO₃ - Calcium carbonate
+        ("H,O", "2,1", "mole"),  # H₂O - Water
+        ("Si,O", "1,2", "mole"),  # SiO₂ - Silicon dioxide
     ]
     return test_cases
 
@@ -34,7 +40,8 @@ def generate_random_compositions(
     max_fraction: float = 1.0,
     seed: int | None = None,
     element_range: tuple[int, int] = (1, 92),
-) -> list[tuple[str, str]]:
+    randomize_mode: bool = True,
+) -> list[tuple[str, str, str]]:
     """Generate random composition test cases.
 
     Args:
@@ -48,11 +55,14 @@ def generate_random_compositions(
         seed: Random seed for reproducibility (default: None)
         element_range: Tuple of (min_atomic_number, max_atomic_number) for element
             selection (default: (1, 92))
+        randomize_mode: If True, randomly choose weight/mole mode;
+            if False, all use weight (default: True)
 
     Returns:
-        List of tuples in format: [(elements_str, fractions_str), ...]
-        where elements_str is comma-separated element symbols (e.g., "Fe,O")
-        and fractions_str is comma-separated fraction values (e.g., "0.7200,0.2800")
+        List of tuples in format: [(elements_str, fractions_str, mode), ...]
+        where elements_str is comma-separated element symbols (e.g., "Fe,O"),
+        fractions_str is comma-separated fraction values (e.g., "0.7200,0.2800"),
+        and mode is either "weight" or "mole"
 
     Examples:
         # Generate 5 normalized compositions with seed for reproducibility
@@ -90,7 +100,7 @@ def generate_random_compositions(
                 ({available_elements}) in range {element_range}"
         )
 
-    test_cases: list[tuple[str, str]] = []
+    test_cases: list[tuple[str, str, str]] = []
 
     for _ in range(count):
         # Randomly choose number of elements for this composition
@@ -118,12 +128,15 @@ def generate_random_compositions(
         elements_str = ",".join(symbols)
         fractions_str = ",".join(f"{f:.4f}" for f in fractions)
 
-        test_cases.append((elements_str, fractions_str))
+        # Choose mode
+        mode = random.choice(["weight", "mole"]) if randomize_mode else "weight"
+
+        test_cases.append((elements_str, fractions_str, mode))
 
     return test_cases
 
 
-def get_random_params(count: int = 10, seed: int = 42) -> list[tuple[str, str]]:
+def get_random_params(count: int = 10, seed: int = 42) -> list[tuple[str, str, str]]:
     """Get random composition test parameters with sensible defaults.
 
     Args:
@@ -131,29 +144,38 @@ def get_random_params(count: int = 10, seed: int = 42) -> list[tuple[str, str]]:
         seed: Random seed for reproducibility (default: 42)
 
     Returns:
-        List of tuples in format: [(elements_str, fractions_str), ...]
+        List of tuples in format: [(elements_str, fractions_str, mode), ...]
+        Mode is randomly chosen between "weight" and "mole" for each test case.
     """
-    return generate_random_compositions(count=count, seed=seed)
+    return generate_random_compositions(count=count, seed=seed, randomize_mode=True)
 
 
 @pytest.mark.epq_ref(module="CompositionDetail")
-@pytest.mark.parametrize("elements,fractions", get_params())
+@pytest.mark.parametrize("elements,fractions,mode", get_params())
 class TestCompositionDetail:
     """Test that Python Composition implementation matches Java reference for
     per-element properties."""
 
     @pytest.fixture(autouse=True)
     def setup(
-        self, elements: str, fractions: str, java_dump: list[CompositionDetailRow]
+        self,
+        elements: str,
+        fractions: str,
+        mode: str,
+        java_dump: list[CompositionDetailRow],
     ):
         # Parse test inputs
         element_names = elements.split(",")
         fraction_values = [float(f) for f in fractions.split(",")]
 
-        # Create Python composition
+        # Create Python composition based on mode
         # Element constructor accepts int (atomic number) or str (element symbol)
         py_elements = [Element(name.strip()) for name in element_names]
-        self.py_composition = Composition(py_elements, fraction_values, weight=True)
+        # Note: mode affects how composition is constructed but output is identical
+        is_weight_mode = mode.lower() == "weight"
+        self.py_composition = Composition(
+            py_elements, fraction_values, weight=is_weight_mode
+        )
 
         # Java reference data
         self.ref_rows = java_dump
@@ -221,22 +243,29 @@ class TestCompositionDetail:
 
 
 @pytest.mark.epq_ref(module="CompositionSummary")
-@pytest.mark.parametrize("elements,fractions", get_params())
+@pytest.mark.parametrize("elements,fractions,mode", get_params())
 class TestCompositionSummary:
     """Test that Python Composition implementation matches Java reference for
     aggregate properties."""
 
     @pytest.fixture(autouse=True)
     def setup(
-        self, elements: str, fractions: str, java_dump: list[CompositionSummaryRow]
+        self,
+        elements: str,
+        fractions: str,
+        mode: str,
+        java_dump: list[CompositionSummaryRow],
     ):
         # Parse test inputs
         element_names = elements.split(",")
         fraction_values = [float(f) for f in fractions.split(",")]
 
-        # Create Python composition
+        # Create Python composition based on mode
         py_elements = [Element(name.strip()) for name in element_names]
-        self.py_composition = Composition(py_elements, fraction_values, weight=True)
+        is_weight_mode = mode.lower() == "weight"
+        self.py_composition = Composition(
+            py_elements, fraction_values, weight=is_weight_mode
+        )
 
         # Java reference data (single row for whole composition)
         self.ref_row = java_dump[0]
