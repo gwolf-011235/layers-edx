@@ -51,9 +51,24 @@ class XRayTransitionRow(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, strict=False)
 
 
+class LenardCoefficientRow(BaseModel):
+    """Model for a single LenardCoefficient row."""
+
+    beam_energy_kev: float
+    Z: int
+    transition_index: int
+    algorithm: str
+    exists: bool
+    edge_energy_kev: float | EmptyStrToNone
+    coefficient: float | EmptyStrToNone
+
+    model_config = ConfigDict(str_strip_whitespace=True, strict=False)
+
+
 _MODELS: Dict[str, Type[BaseModel]] = {
     "Element": ElementRow,
     "XRayTransition": XRayTransitionRow,
+    "LenardCoefficient": LenardCoefficientRow,
 }
 
 
