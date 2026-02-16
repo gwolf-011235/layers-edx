@@ -45,9 +45,10 @@ public final class DumpCompositionSummary implements DumpModule {
 
   @Override
   public String usage() {
-    return "CompositionSummary elements=<symbol,list> fractions=<decimal,list>\n" +
+    return "CompositionSummary elements=<symbol,list> fractions=<decimal,list> [mode=weight|mole]\n" +
         "  elements: comma-separated element symbols or atomic numbers (e.g. Fe,O or 26,8)\n" +
-        "  fractions: comma-separated mass fractions (must match element count)";
+        "  fractions: comma-separated fractions (must match element count)\n" +
+        "  mode: fraction type - 'weight' (default) or 'mole' for stoichiometric";
   }
 
   @Override
@@ -59,8 +60,9 @@ public final class DumpCompositionSummary implements DumpModule {
   public void run(DumpContext ctx) throws IllegalArgumentException {
 
     // Parse arguments
-    List<String> elementNames = ctx.getList("elements");
-    List<String> fractionStrs = ctx.getList("fractions");
+    final List<String> elementNames = ctx.getList("elements");
+    final List<String> fractionStrs = ctx.getList("fractions");
+    final String mode = ctx.getOrDefault("mode", "weight").toLowerCase();
 
     // Validate counts match
     if (elementNames.size() != fractionStrs.size()) {
@@ -88,8 +90,18 @@ public final class DumpCompositionSummary implements DumpModule {
       }
     }
 
-    // Create composition
-    Composition comp = new Composition(elements, fractions);
+    // Create composition based on mode
+    Composition comp;
+
+    if (mode.equals("mole")) {
+      comp = new Composition();
+      comp.defineByMoleFraction(elements, fractions);
+    } else if (mode.equals("weight")) {
+      comp = new Composition(elements, fractions);
+    } else {
+      throw new IllegalArgumentException(
+          "Invalid mode: " + mode + ". Must be 'weight' or 'mole'");
+    }
 
     // Get aggregate properties with uncertainties
     var wavgU = comp.weightAvgAtomicNumberU();

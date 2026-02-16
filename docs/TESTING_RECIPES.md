@@ -1143,6 +1143,36 @@ def test_weight_fractions(elements: str, fractions: str, java_dump: list[Composi
         assert py_frac == pytest.approx(row.weight_fraction, rel=1e-9)
 ```
 
+### Testing with Different Fraction Modes
+
+The composition dump modules support both weight fractions and mole fractions (stoichiometry). You can parametrize tests to verify both modes:
+
+```python
+@pytest.mark.epq_ref(module="CompositionDetail")
+@pytest.mark.parametrize("elements,fractions,mode", [
+    # Weight-based compositions
+    ("Fe,O", "0.6994,0.3006", "weight"),
+    ("Ca,C,O", "0.400,0.120,0.480", "weight"),
+
+    # Mole-based compositions (stoichiometry)
+    ("Fe,O", "2,3", "mole"),           # Fe₂O₃
+    ("Ca,C,O", "1,1,3", "mole"),       # CaCO₃
+    ("H,O", "2,1", "mole"),            # H₂O
+])
+def test_composition_modes(elements: str, fractions: str, mode: str,
+                          java_dump: list[CompositionDetailRow]):
+    """Test compositions defined by weight or mole fractions."""
+    # The mode affects input interpretation, but output is always the same
+    # Fe₂O₃ by mole (2,3) produces same result as by weight (0.6994,0.3006)
+
+    elem_list = elements.split(",")
+    assert len(java_dump) == len(elem_list)
+
+    # Verify all elements are present
+    dumped_elements = {row.element for row in java_dump}
+    assert dumped_elements == set(elem_list)
+```
+
 **See Also**: `test/epq_dump/test_composition.py` for complete working examples with the `generate_random_compositions()` helper function.
 
 ---
